@@ -9,6 +9,9 @@
 //	for e := l.Front(); e != nil; e = e.Next() {
 //		// do something with e.Value
 //	}
+
+// +gobra
+
 package list
 
 // Element is an element of a linked list.

@@ -1,0 +1,55 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# Copyright (c) 2011-2020 ETH Zurich.
+
+name: Verify the specified codebase
+
+on:
+  push:
+    branches:
+    - master
+  pull_request: # run this workflow on every pull_request
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      headerOnly: 1
+      includePaths: 'src'
+      assumeInjectivityOnInhale: '1'
+      checkConsistency: '1'
+    steps:
+      - name: Checkout the verified_go_stdlib repository
+        uses: actions/checkout@v3
+      - name: Cache the verification results
+        uses: actions/cache@v3
+        env:
+          cache-name: gobra-cache
+        with:
+          path: ${{ runner.workspace }}/.gobra/cache.json
+          key: ${{ env.cache-name }}
+      # We split the verification of the entire repository into
+      # multiple steps. This provides a more fine-grained log in
+      # Github Workflow's interface and it allows more fine-grained
+      # control over the settings applied to each package (this last
+      # point could be also be solved by adapting the action to allow
+      # per package config).
+      - name: Verify package 'container/list'
+        uses: viperproject/gobra-action@main
+        with:
+          packages: 'src/container/list'
+          timeout: 10m
+          headerOnly: ${{ env.headerOnly }}
+          includePaths: ${{ env.includePaths }}
+          assumeInjectivityOnInhale: ${{ env.assumeInjectivityOnInhale }}
+          checkConsistency: ${{ env.checkConsistency }}
+          statsFile: '/stats/stats_list.json'
+      - name: Upload the verification report
+        uses: actions/upload-artifact@v2
+        with:
+          name: stats_list.json
+          path: /stats/stats_list.json
+          if-no-files-found: error # could also be 'warn' or 'ignore'
+
