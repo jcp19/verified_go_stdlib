@@ -42,7 +42,6 @@ jobs:
           packages: 'src/container/list'
           timeout: 10m
           headerOnly: ${{ env.headerOnly }}
-          module: ${{ env.module }}
           includePaths: ${{ env.includePaths }}
           assumeInjectivityOnInhale: ${{ env.assumeInjectivityOnInhale }}
           checkConsistency: ${{ env.checkConsistency }}
