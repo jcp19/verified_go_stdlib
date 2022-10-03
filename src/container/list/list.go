@@ -14,6 +14,8 @@
 
 package list
 
+pred Mem()
+
 // Element is an element of a linked list.
 type Element struct {
 	// Next and previous pointers in the doubly-linked list of elements.
