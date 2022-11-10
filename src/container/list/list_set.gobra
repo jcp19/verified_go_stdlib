@@ -67,7 +67,7 @@ type List struct {
 	lenT int     // current list length excluding (this) sentinel element
 }
 
-
+/*
 pred (l *List) Mem(ghost s set[*Element]) {
 	acc(&l.lenT) &&
 	len(s) >= 0 &&
@@ -75,6 +75,17 @@ pred (l *List) Mem(ghost s set[*Element]) {
 	&l.root in s &&
 	(forall i *Element :: i in s ==> (acc(&i.next) && acc(&i.prev) && acc(&i.list) && acc(&i.Value))) && //consider changing list permissions to 1/2
 	(forall i *Element :: i in s ==> ((i != &l.root ==> i.list == l) && i.next in s && i.prev in s && i.next.prev == i && i.prev.next == i))
+}*/
+
+pred (l *List) Mem(ghost s set[*Element]) {
+	acc(&l.lenT) &&
+	len(s) >= 0 &&
+	l.lenT == len(s)-1 &&
+	&l.root in s &&
+	(forall i *Element :: i in s ==> (acc(&i.next) && acc(&i.prev) && acc(&i.list) && acc(&i.Value))) && //consider changing list permissions to 1/2
+	(forall i *Element :: i in s ==> ((i != &l.root ==> i.list == l))) &&
+	(forall i, j *Element :: (i in s && i.next == j) ==> (j in s && j.prev == i && i.next.prev == i && j.prev.next == j)) &&
+	(forall i, j *Element :: (i in s && i.prev == j) ==> (j in s && j.next == i && i.prev.next == i && j.next.prev == j))
 }
 
 
@@ -110,6 +121,7 @@ func (l *List) Len(ghost elems set[*Element]) (res int) { //# maybe useful to ma
 requires acc(l.Mem(elems),1/2)
 ensures  acc(l.Mem(elems),1/2)
 ensures  unfolding acc(l.Mem(elems),1/2) in ((l.lenT == 0) ==> res == nil) && ((l.lenT != 0) ==> res == l.root.next)
+decreases
 func (l *List) Front(ghost elems set[*Element]) (res *Element) {
 	unfold acc(l.Mem(elems),1/2)
 	defer fold acc(l.Mem(elems),1/2)
@@ -123,6 +135,7 @@ func (l *List) Front(ghost elems set[*Element]) (res *Element) {
 requires acc(l.Mem(elems),1/2)
 ensures  acc(l.Mem(elems),1/2)
 ensures  unfolding acc(l.Mem(elems),1/2) in ((l.lenT == 0) ==> res == nil) && ((l.lenT != 0) ==> res == l.root.prev)
+decreases
 func (l *List) Back(ghost elems set[*Element]) (res *Element) {
 	unfold acc(l.Mem(elems),1/2)
 	defer fold acc(l.Mem(elems),1/2)
@@ -133,14 +146,21 @@ func (l *List) Back(ghost elems set[*Element]) (res *Element) {
 }
 
 // lazyInit lazily initializes a zero List value.
-requires acc(l) //# can lead to double permissions
-requires (l.root.next != nil) ==> (l.Mem(elems))
-//ensures  old(l.root.next == nil) ==> l.Mem(set[*Element]{&l.root})
-ensures  old(l.root.next != nil) ==> (l.Mem(elems))
-ensures  old(l.root.next == nil) ==> (l.Mem(set[*Element]{&l.root}))
-func (l *List) lazyInit(ghost elems set[*Element]) {
+//# while this works, i don't like it. the method assumes that all other methods leave the data structure in a consistent state and merely relies on l.root.next==nil to see whether it was already initialized
+requires (!isInit) ==> (acc(l) && l.root.next == nil)
+requires isInit ==> (l.Mem(elems))
+ensures  (!isInit) ==> (l.Mem(set[*Element]{&l.root}))
+ensures  isInit ==> (l.Mem(elems))
+decreases
+func (l *List) lazyInit(ghost elems set[*Element], ghost isInit bool) {
+	ghost if isInit{
+		unfold l.Mem(elems)
+	}
 	if l.root.next == nil {
 		l.Init()
+	}
+	ghost if isInit{
+		fold l.Mem(elems)
 	}
 }
 
@@ -148,9 +168,12 @@ func (l *List) lazyInit(ghost elems set[*Element]) {
 requires l.Mem(elems)
 requires acc(e)
 requires at in elems
-//ensures  l.Mem(elems)
-//ensures  unfolding l.Mem(elems) in (at.next == e && e.prev == at)
+requires !(e in elems)
+ensures  l.Mem(elems union set[*Element]{e})
+ensures  unfolding l.Mem(elems union set[*Element]{e}) in (at.next == e && e.prev == at) //# is this necessary?
 ensures  res == e
+//# is the increment of l.lenT implicit or do we need to mention it explicitly? it should be explicit because we had !(e in elems) in the precondition
+decreases
 func (l *List) insert(e, at *Element, ghost elems set[*Element]) (res *Element) {
 	unfold l.Mem(elems)
 	//assert at in elems
@@ -158,35 +181,58 @@ func (l *List) insert(e, at *Element, ghost elems set[*Element]) (res *Element) 
 	e.next = at.next
 	e.prev.next = e
 	e.next.prev = e
+	//assert at.next == e
+	//assert e.prev == at
+	//assert at in (elems union set[*Element]{e})
+	//assert e in (elems union set[*Element]{e})
 	e.list = l
 	l.lenT++
+	//assert l.lenT == len(elems union set[*Element]{e})-1
 	res = e
 	fold l.Mem(elems union set[*Element]{e})
 }
 
 // insertValue is a convenience wrapper for insert(&Element{Value: v}, at).
-trusted
-func (l *List) insertValue(v any, at *Element) *Element {
-	return l.insert(&Element{Value: v}, at)
+//# ISSUE
+requires l.Mem(elems)
+requires at in elems
+ensures  l.Mem(elems union set[*Element]{res})
+ensures  unfolding l.Mem(elems union set[*Element]{res}) in (at.next == res && res.prev == at) //# is this necessary?
+func (l *List) insertValue(v any, at *Element, ghost elems set[*Element]) (res *Element) {
+	res = &Element{Value: v}
+	assume !(res in elems) //# is this the only way to do this?
+	return l.insert(res, at, elems)
 }
 
 // remove removes e from its list, decrements l.lenT
-trusted
-func (l *List) remove(e *Element) {
+requires l.Mem(elems union set[*Element]{e})
+requires len(elems union set[*Element]{e}) == len(elems)+1 //#this is an alternative to the line below
+//requires !(e in elems) //# this is somewhat of a postcondition but can it go here?
+requires e != &l.root
+ensures  l.Mem(elems)
+//# how to have a postcondition for e.list==nil etc? we don't have permissions to e in l.Mem(elems) and old(... e.list==nil) is false
+func (l *List) remove(e *Element, ghost elems set[*Element]) {
+	unfold l.Mem(elems union set[*Element]{e})
 	e.prev.next = e.next
 	e.next.prev = e.prev
 	e.next = nil // avoid memory leaks
 	e.prev = nil // avoid memory leaks
 	e.list = nil
 	l.lenT--
+	fold l.Mem(elems)
 }
 
 // move moves e to next to at.
-trusted
-func (l *List) move(e, at *Element) {
+requires l.Mem(elems)
+requires e in elems
+requires at in elems
+ensures  l.Mem(elems)
+ensures  (e != at ==> (unfolding l.Mem(elems) in (at.next == e && e.prev == at)))
+func (l *List) move(e, at *Element, ghost elems set[*Element]) {
 	if e == at {
 		return
 	}
+	unfold l.Mem(elems)
 	e.prev.next = e.next
 	e.next.prev = e.prev
 
@@ -194,6 +240,7 @@ func (l *List) move(e, at *Element) {
 	e.next = at.next
 	e.prev.next = e
 	e.next.prev = e
+	fold l.Mem(elems)
 }
 
 // Remove removes e from l if e is an element of list l.
