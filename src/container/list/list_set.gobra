@@ -172,7 +172,7 @@ requires !(e in elems)
 ensures  l.Mem(elems union set[*Element]{e})
 ensures  unfolding l.Mem(elems union set[*Element]{e}) in (at.next == e && e.prev == at) //# is this necessary?
 ensures  res == e
-//# is the increment of l.lenT implicit or do we need to mention it explicitly? it should be explicit because we had !(e in elems) in the precondition
+//# is the increment of l.lenT implicit or do we need to mention it explicitly? it should be given implicitly because we had !(e in elems) in the precondition
 decreases
 func (l *List) insert(e, at *Element, ghost elems set[*Element]) (res *Element) {
 	unfold l.Mem(elems)
@@ -198,6 +198,7 @@ requires l.Mem(elems)
 requires at in elems
 ensures  l.Mem(elems union set[*Element]{res})
 ensures  unfolding l.Mem(elems union set[*Element]{res}) in (at.next == res && res.prev == at) //# is this necessary?
+decreases
 func (l *List) insertValue(v any, at *Element, ghost elems set[*Element]) (res *Element) {
 	res = &Element{Value: v}
 	assume !(res in elems) //# is this the only way to do this?
@@ -206,10 +207,13 @@ func (l *List) insertValue(v any, at *Element, ghost elems set[*Element]) (res *
 
 // remove removes e from its list, decrements l.lenT
 requires l.Mem(elems union set[*Element]{e})
+requires e in (elems union set[*Element]{e}) //# this is obvious
 requires len(elems union set[*Element]{e}) == len(elems)+1 //#this is an alternative to the line below
-//requires !(e in elems) //# this is somewhat of a postcondition but can it go here?
+//requires !(e in elems)
 requires e != &l.root
 ensures  l.Mem(elems)
+ensures  !(e in elems)
+//decreases //# this causes the fold to fail, why?
 //# how to have a postcondition for e.list==nil etc? we don't have permissions to e in l.Mem(elems) and old(... e.list==nil) is false
 func (l *List) remove(e *Element, ghost elems set[*Element]) {
 	unfold l.Mem(elems union set[*Element]{e})
@@ -228,6 +232,7 @@ requires e in elems
 requires at in elems
 ensures  l.Mem(elems)
 ensures  (e != at ==> (unfolding l.Mem(elems) in (at.next == e && e.prev == at)))
+decreases
 func (l *List) move(e, at *Element, ghost elems set[*Element]) {
 	if e == at {
 		return
@@ -247,6 +252,8 @@ func (l *List) move(e, at *Element, ghost elems set[*Element]) {
 // It returns the element value e.Value.
 // The element must not be nil.
 trusted
+//# what should we do here? we already know from the issue on github that the check e.list==l is not good enough.
+//# also what about the comment? crashing is correct behaviour? e.list==l implies consistent list? what do we really want to capture with the specification?
 func (l *List) Remove(e *Element) any {
 	if e.list == l {
 		// if e.list == l, l must have been initialized when e was inserted
@@ -257,10 +264,20 @@ func (l *List) Remove(e *Element) any {
 }
 
 // PushFront inserts a new element e with value v at the front of list l and returns e.
-trusted
-func (l *List) PushFront(v any) *Element {
-	l.lazyInit()
-	return l.insertValue(v, &l.root)
+requires (!isInit) ==> (acc(l) && l.root.next == nil) //#this reveals too much about the internal structure but is a result from the precondition of lazyInit
+requires isInit ==> (l.Mem(elems) && &l.root in elems) //# why is the second conjunct needed? &l.root in elems is already part of the predicate
+//# the postcondition should reason about the element res and its position in the list
+decreases
+func (l *List) PushFront(v any, ghost elems set[*Element], ghost isInit bool) (res *Element) {
+	l.lazyInit(elems, isInit)
+
+	//# i feel like cheating, is there a cleaner way to do this?
+	ghost if isInit{
+		res = l.insertValue(v, &l.root, elems)
+		return
+	} //# how to ghost else?
+	res = l.insertValue(v, &l.root, set[*Element]{&l.root})
+	
 }
 
 // PushBack inserts a new element e with value v at the back of list l and returns e.
