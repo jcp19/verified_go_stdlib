@@ -225,77 +225,24 @@ func (l *List) insertValue(v any, at *Element, ghost elems set[*Element]) (res *
 	return l.insert(res, at, elems)
 }
 
-/*
-//# remove OLD ATTEMPT
-requires l.Mem((elems union set[*Element]{e}),true)
-requires e in (elems union set[*Element]{e}) //# this is obvious
-//requires len(elems union set[*Element]{e}) == len(elems)+1 //#this is an alternative to the line below
-requires !(e in elems)
+
+requires l.Mem(elems,true)
+requires e in elems
 requires e != &l.root
-ensures  l.Mem(elems,true)
-ensures  !(e in elems)
+ensures  l.Mem((elems setminus (set[*Element]{e})),true)
+ensures  !(e in (elems setminus (set[*Element]{e})))
 ensures  acc(e) && e.list == nil
-//decreases //# this causes the fold to fail, why?
+decreases
 func (l *List) remove(e *Element, ghost elems set[*Element]) {
-    unfold l.Mem((elems union set[*Element]{e}),true)
-    e.prev.next = e.next
-    e.next.prev = e.prev
-    e.next = nil // avoid memory leaks
-    e.prev = nil // avoid memory leaks
-    e.list = nil
-    l.lenT--
-    fold l.Mem(elems,true)
-}*/
-
-/*
-// remove removes e from its list, decrements l.lenT
-requires l.Mem(elemsIn, true)
-requires e != &l.root
-requires &l.root in elemsOut //# it should be able to derive that '&l.root in elemsOut' but it cannot
-requires e in (elemsIn)
-requires !(e in elemsOut)
-requires (forall i *Element :: (i in elemsOut) ==> (i in elemsIn)) //# all elements of elemsOut are in elemsIn
-requires len(elemsIn) == len(elemsOut)+1 //# elemsIn has 1 more element than elemsOut (that should be e)
-ensures  l.Mem(elemsOut, true)
-ensures  !(e in elemsOut)
-ensures acc(e) && e.list == nil
-//decreases //# this causes the fold to fail, why?
-func (l *List) remove(e *Element, ghost elemsIn set[*Element], ghost elemsOut set[*Element]) {
-	unfold l.Mem(elemsIn, true)
+	unfold l.Mem(elems, true)
 	e.prev.next = e.next
 	e.next.prev = e.prev
 	e.next = nil // avoid memory leaks
 	e.prev = nil // avoid memory leaks
 	e.list = nil
 	l.lenT--
-	fold l.Mem(elemsOut, true)
+	fold l.Mem((elems setminus (set[*Element]{e})), true)
 }
-*/
-
-
-
-//SETMINUS ATTEMPT
-// remove removes e from its list, decrements l.lenT
-requires l.Mem(elemsIn, true)
-requires e != &l.root
-requires elemsOut == (elemsIn setminus (set[*Element]{e}))
-//requires &l.root in elemsOut //# it should be able to derive that '&l.root in elemsOut' but it cannot
-requires e in (elemsIn)
-ensures  l.Mem(elemsOut, true)
-ensures  !(e in elemsOut)
-ensures acc(e) && e.list == nil
-//decreases //# this causes the fold to fail, why?
-func (l *List) remove(e *Element, ghost elemsIn set[*Element], ghost elemsOut set[*Element]) {
-	unfold l.Mem(elemsIn, true)
-	e.prev.next = e.next
-	e.next.prev = e.prev
-	e.next = nil // avoid memory leaks
-	e.prev = nil // avoid memory leaks
-	e.list = nil
-	l.lenT--
-	fold l.Mem(elemsOut, true)
-}
-
 
 
 
@@ -323,33 +270,31 @@ func (l *List) move(e, at *Element, ghost elems set[*Element]) {
 
 
 
-
-
-
 // Remove removes e from l if e is an element of list l.
 // It returns the element value e.Value.
 // The element must not be nil.
 requires e != nil
-requires l.Mem(elemsIn, true)
+requires l.Mem(elems, true)
 requires e != &l.root
-requires elemsOut == (elemsIn setminus (set[*Element]{e}))
-requires !(e in elemsIn) ==> (elemsIn == elemsOut) //# After the branch, we don't know wheter the element was originally in the list, we do this, so 
+requires !(e in elems) ==> (elems == (elems setminus (set[*Element]{e}))) //# After the branch, we don't know wheter the element was originally in the list, we do this, so 
 //# The next three lines aim to establish: (e.list == l) IFF (e in elems)
-requires !(e in elemsIn) ==> (acc(e) && e.list != l)
-requires (e in elemsIn) ==> (unfolding l.Mem(elemsIn, true) in e.list == l)
-requires unfolding l.Mem(elemsIn, true) in ((e.list == l ==> e in elemsIn) && ((e.list != l) ==> !(e in elemsIn)))
-ensures  l.Mem(elemsOut, true) //# no need to explicitly fold if !(e in elemsIn) because l.Mem(elemsIn,true) never gets unfolded and elemsIn==elemsOut
-ensures  acc(e) && e.Value === res && (e in elemsIn ==> e.list == nil)
-func (l *List) Remove(e *Element, ghost elemsIn set[*Element], ghost elemsOut set[*Element]) (res any) {
-	ghost if e in elemsIn{
-		unfold l.Mem(elemsIn, true)
+requires !(e in elems) ==> (acc(e) && e.list != l)
+requires (e in elems) ==> (unfolding l.Mem(elems, true) in e.list == l)
+requires unfolding l.Mem(elems, true) in ((e.list == l ==> e in elems) && ((e.list != l) ==> !(e in elems)))
+ensures  !(e in elems) ==> l.Mem(elems, true)
+ensures  (e in elems) ==> (l.Mem((elems setminus (set[*Element]{e})), true) && !(e in (elems setminus (set[*Element]{e}))))
+ensures  acc(e) && e.Value === res && (e in elems ==> e.list == nil)
+decreases
+func (l *List) Remove(e *Element, ghost elems set[*Element]) (res any) {
+	ghost if e in elems{
+		unfold l.Mem(elems, true)
 	}
 
 	if e.list == l {
 		// if e.list == l, l must have been initialized when e was inserted
 		// in l or l == nil (e is a zero Element) and l.remove will crash
-		fold l.Mem(elemsIn, true)
-		l.remove(e, elemsIn, elemsOut)
+		fold l.Mem(elems, true)
+		l.remove(e, elems)
 	}
 
 	return e.Value
