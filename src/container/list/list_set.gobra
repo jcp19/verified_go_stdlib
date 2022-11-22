@@ -92,7 +92,7 @@ pred (l *List) Mem(ghost s set[*Element], ghost isInit bool) {
 	(isInit ==> (
 		len(s) >= 0 &&
 		l.lenT == len(s)-1 &&
-		(forall i *Element :: i in s ==> ((i != &l.root ==> i.list == l))) &&
+		(forall i *Element :: i in s ==> (i.next != nil && i.prev != nil && (i != &l.root ==> i.list == l))) &&
 		(forall i, j *Element :: ((i in s && i.next == j) ==> (j in s && j.prev == i && i.next.prev == i && j.prev.next == j/* && i.prev.next == i && j.next.prev == j*/))) &&
 		(forall i, j *Element :: ((i in s && i.prev == j) ==> (j in s && j.next == i && i.prev.next == i && j.next.prev == j/* && i.next.prev == i && j.prev.next == j*/))))) //# add triggers (i.prev.next, j.next.prev)
 		//# for triggers have to mention all quant. variables, cannot use equality, have to go via pure function
@@ -170,13 +170,9 @@ ensures  l.Mem(elems, true)
 decreases
 func (l *List) lazyInit(ghost elems set[*Element], ghost isInit bool) {
 	unfold l.Mem(elems, isInit)
-
-	ghost if(l.root.next != nil){
-		assume isInit
-		//# The above assumption is necessary because this is the check the method uses to see whether the list is already initialized.
-		//# Alternatively, we could put this as an implication in the predicate.
-		//# It is NOT SAFE in the sense that this check guarantees a properly formed list.
-	}
+	//ghost if(l.root.next != nil){
+		//assume isInit
+	//}
 
 	if l.root.next == nil {
 		//# Here isInit==false is implied
@@ -184,7 +180,6 @@ func (l *List) lazyInit(ghost elems set[*Element], ghost isInit bool) {
 		l.Init(elems, false)
 		return //# Added this return because the fold only needs to happen in the else-case. Init already returns the predicate with isInit==true.
 	}
-
 	fold l.Mem(elems, true)
 }
 
