@@ -55,71 +55,121 @@ type List struct {
 	lenT  int     // current list length excluding (this) sentinel element
 }
 
-pred (l *List) Mem(ghost s seq[*Element]) {
-	acc(&l.lenT) &&
-	len(s) >= 1 &&
-	l.lenT == len(s)-1 &&
-	(forall idx int :: 0 <= idx && idx <= l.lenT ==> (acc(&(s[idx]).next) && acc(&(s[idx]).prev) && acc(&(s[idx]).list) && acc(&(s[idx]).Value))) && //consider changing list permissions to 1/2
-	s[0] == &l.root && 
-	s[0].prev == s[l.lenT] &&
-	s[l.lenT].next == s[0] &&
-	(forall idx int :: 0 <= idx && idx < l.lenT ==> (s[idx].next == s[idx+1] && s[idx] == s[idx+1].prev)) &&
-	(forall idx int :: 0 < idx && idx <= l.lenT ==> (s[idx].prev == s[idx-1] && s[idx] == s[idx-1].next && s[idx].list == l)) //&&
+pred (l *List) Mem(ghost s seq[*Element], isInit bool) {
+	//(forall idx int :: 0 <= idx && idx <= l.lenT ==> (acc(&(s[idx]).next) && acc(&(s[idx]).prev) && acc(&(s[idx]).list) && acc(&(s[idx]).Value))) && //consider changing list permissions to 1/2
+
+	 //&&
 	//(forall i *Element :: i in s ==> ((i != &l.root ==> i.list == l) && i.next in s && i.prev in s && i.next.prev == i && i.prev.next == i))
+
+	acc(&l.lenT) &&
+	&l.root in s &&
+	s[0] == &l.root &&
+	(forall i *Element :: i in s ==> (acc(&i.next) && acc(&i.prev) && acc(&i.list) && acc(&i.Value))) && //consider changing list permissions to 1/2
+	//(forall idx int :: 0 <= idx && idx <= l.lenT ==> (acc(&(s[idx]).next) && acc(&(s[idx]).prev) && acc(&(s[idx]).list) && acc(&(s[idx]).Value))) &&
+	((l.root.next == nil || l.root.prev == nil) ==> !isInit) &&
+	(!isInit ==> ((len(s)==1 && s == seq[*Element]{&l.root}) && (l.root.next == nil && l.root.prev == nil))) &&
+	(isInit ==> (
+		len(s) >= 1 &&
+		l.lenT == len(s)-1 &&
+		s[0].prev == s[l.lenT] &&
+		s[l.lenT].next == s[0] &&
+		(forall i *Element :: i in s ==> (i.next != nil && i.prev != nil && (i != &l.root ==> i.list == l))) &&
+		(forall i, j *Element :: ((i in s && i.next == j) ==> (j in s && j.prev == i && i.next.prev == i && j.prev.next == j))) &&
+		(forall i, j *Element :: ((i in s && i.prev == j) ==> (j in s && j.next == i && i.prev.next == i && j.next.prev == j))) &&
+		(forall idx int :: 0 <= idx && idx < l.lenT ==> (s[idx].next == s[idx+1] && s[idx] == s[idx+1].prev)) && //# redundant?
+		(forall idx int :: 0 < idx && idx <= l.lenT ==> (s[idx].prev == s[idx-1] && s[idx] == s[idx-1].next && s[idx].list == l))))
 }
 
 // Init initializes or clears list l.
-trusted
-func (l *List) Init() *List {
+requires l.Mem(elems, isInit)
+ensures  res == l
+ensures  l.Mem(seq[*Element]{&l.root}, true)
+decreases
+func (l *List) Init(ghost elems seq[*Element], ghost isInit bool) (res *List) {
+	unfold l.Mem(elems, isInit)
 	l.root.next = &l.root
 	l.root.prev = &l.root
 	l.lenT = 0
+	fold l.Mem(seq[*Element]{&l.root}, true)
 	return l
 }
 
 // New returns an initialized list.
-trusted
-func New() *List { return new(List).Init() }
+ensures l.Mem(seq[*Element]{&l.root}, true)
+decreases
+func New() (l *List) {
+	l = new(List)
+	fold l.Mem(seq[*Element]{&l.root}, false)
+	l.Init(seq[*Element]{&l.root}, false)
+}
 
 // lenT returns the number of elements of list l.
 // The complexity is O(1).
-trusted
-func (l *List) Len() int { return l.lenT }
+requires l.Mem(elems, true)
+ensures  unfolding l.Mem(elems, true) in res==l.lenT
+decreases
+pure func (l *List) Len(ghost elems seq[*Element]) (res int) {
+	return unfolding l.Mem(elems, true) in l.lenT
+}
 
 // Front returns the first element of list l or nil if the list is empty.
-trusted
-func (l *List) Front() *Element {
+requires acc(l.Mem(elems, true),1/2)
+ensures  acc(l.Mem(elems, true),1/2)
+ensures  unfolding acc(l.Mem(elems, true),1/2) in ((l.lenT == 0) ==> res == nil) && ((l.lenT != 0) ==> (res == l.root.next && elems[1] == res))
+decreases
+func (l *List) Front(ghost elems seq[*Element]) (res *Element) {
+	unfold acc(l.Mem(elems, true),1/2)
 	if l.lenT == 0 {
+		fold acc(l.Mem(elems, true),1/2)
 		return nil
 	}
-	return l.root.next
+	res = l.root.next
+	fold acc(l.Mem(elems, true),1/2)
 }
 
 // Back returns the last element of list l or nil if the list is empty.
-trusted
-func (l *List) Back() *Element {
+requires acc(l.Mem(elems, true),1/2)
+ensures  acc(l.Mem(elems, true),1/2)
+ensures  unfolding acc(l.Mem(elems, true),1/2) in ((l.lenT == 0) ==> res == nil) && ((l.lenT != 0) ==> (res == l.root.prev && elems[l.lenT] == res))
+decreases
+func (l *List) Back(ghost elems seq[*Element]) (res *Element) {
+	unfold acc(l.Mem(elems, true),1/2)
 	if l.lenT == 0 {
+		fold acc(l.Mem(elems, true),1/2)
 		return nil
 	}
-	return l.root.prev
+	res = l.root.prev
+	fold acc(l.Mem(elems, true),1/2)
 }
 
 // lazyInit lazily initializes a zero List value.
-trusted
-func (l *List) lazyInit() {
+requires l.Mem(elems, isInit)
+ensures  l.Mem(elems, true)
+decreases
+func (l *List) lazyInit(ghost elems seq[*Element], ghost isInit bool) {
+	unfold l.Mem(elems, isInit)
 	if l.root.next == nil {
-		l.Init()
+		//# Here isInit==false is implied
+		fold l.Mem(elems, isInit)
+		l.Init(elems, false)
+		return //# Added this return because the fold only needs to happen in the else-case. Init already returns the predicate with isInit==true.
 	}
+	fold l.Mem(elems, true)
 }
 
-// insert inserts e after at, increments l.lenT, and returns e.
-requires l.Mem(elems1++elems2)
-requires acc(e)
-requires at_idx >=0 && at_idx < len(elems1) && elems1[at_idx] == at
-//ensures  l.Mem(elems)
-//ensures  (unfolding l.Mem(elems) in l.lenT) == (old(unfolding l.Mem(elems) in l.lenT) + 1
-//ensures  old(len(elems)) + 1 == len(elems)
-//ensures  elems[at_idx+1] == e
+
+/*
+requires l.Mem(elems, true)
+requires unfolding l.Mem(elems,true) in len(elems) == 100
+ensures l.Mem(elems, true)
+//ensures elems == res
+ensures len(res) == 100
+func (l *List) testSeq( ghost elems seq[*Element]) (ghost res seq[*Element]){
+	res = elems[:50]++elems[50:]
+}*/
+
+
+trusted
 func (l *List) insert(e, at *Element, ghost elems1 seq[*Element], ghost elems2 seq[*Element], ghost at_idx int) (res *Element) {
 	unfold l.Mem(elems1++elems2)
 	e.prev = at
