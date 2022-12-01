@@ -168,10 +168,15 @@ func (l *List) testSeq( ghost elems seq[*Element]) (ghost res seq[*Element]){
 	res = elems[:50]++elems[50:]
 }*/
 
-
-trusted
-func (l *List) insert(e, at *Element, ghost elems1 seq[*Element], ghost elems2 seq[*Element], ghost at_idx int) (res *Element) {
-	unfold l.Mem(elems1++elems2)
+//# does not terminate after 16 hours
+requires l.Mem(elems, true)
+requires unfolding l.Mem(elems, true) in (0 <= at_idx && at_idx <= l.lenT)
+requires acc(e)
+requires elems[at_idx] == at
+requires !(e in elems)
+ensures  l.Mem((elems[:at_idx]++(seq[*Element]{e})++elems[at_idx:]), true)
+func (l *List) insert(e, at *Element, ghost elems seq[*Element], ghost at_idx int) (res *Element) {
+	unfold l.Mem(elems, true)
 	e.prev = at
 	e.next = at.next
 	e.prev.next = e
@@ -180,7 +185,7 @@ func (l *List) insert(e, at *Element, ghost elems1 seq[*Element], ghost elems2 s
 	e.list = l
 	l.lenT++
 	res = e
-	fold l.Mem((elems1++(seq[*Element]{e}))++elems2)
+	fold l.Mem((elems[:at_idx]++(seq[*Element]{e})++elems[at_idx:]), true)
 	//# sequence is more tricky for changes at random locations in the list but very convenient for beginning/end
 }
 
