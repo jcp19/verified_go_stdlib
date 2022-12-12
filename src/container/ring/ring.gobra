@@ -1,0 +1,251 @@
+// Copyright 2009 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// Package ring implements operations on circular lists.
+
+// +gobra
+package ring
+
+// A Ring is an element of a circular list, or ring.
+// Rings do not have a beginning or end; a pointer to any ring element
+// serves as reference to the entire ring. Empty rings are represented
+// as nil Ring pointers. The zero value for a Ring is a one-element
+// ring with a nil Value.
+type Ring struct {
+	next, prev *Ring
+	Value      any // for use by client; untouched by this library
+}
+
+
+pred (r *Ring) Mem(ghost s set[*Ring], ghost isInit bool) {
+	r in s &&
+	(forall i *Ring :: i in s ==> (acc(&i.next) && acc(&i.prev) &&  acc(&i.Value))) &&
+	((r.next == nil || r.prev == nil) ==> !isInit) && //# More correctly, it is !isInit if it cannot reach itself in both directions via the same Ring elements
+	(!isInit ==> ((s == set[*Ring]{r}) && (r.next == nil && r.prev == nil))) &&
+	(isInit ==> (
+		(len(s)==1 ==> (r.next==r && r.prev==r)) &&
+		(forall i *Ring :: i in s ==> (i.next != nil && i.prev != nil)) &&
+		(forall i, j *Ring :: ((i in s && i.next == j) ==> (j in s && j.prev == i && i.next.prev == i && j.prev.next == j))) &&
+		(forall i, j *Ring :: ((i in s && i.prev == j) ==> (j in s && j.next == i && i.prev.next == i && j.next.prev == j)))))
+}
+//# enforce structure by:
+//# forall elements, forall i in [0,len]: moveLeft(i) == moveRight(len-i)
+//# problematic for Ring because we get Len() by the same logic
+
+requires r.Mem(elems, isInit)
+ensures  r.Mem(set[*Ring]{r}, true)
+ensures  r == res
+decreases
+func (r *Ring) init(ghost elems set[*Ring], ghost isInit bool) (res *Ring) {
+	unfold r.Mem(elems, isInit)
+	r.next = r
+	r.prev = r
+	fold r.Mem(set[*Ring]{r}, true)
+	return r
+}
+
+
+// Next returns the next ring element. r must not be empty.
+requires r != nil
+requires r in elems
+requires owner.Mem(elems, isInit)
+ensures  !isInit ==> (owner.Mem(set[*Ring]{r}, true) && res == r) //# The comment does not explain that r is returned if the ring is not initialized but that's what the implementation does.
+ensures  isInit ==> owner.Mem(elems, true)
+ensures  isInit ==> (unfolding owner.Mem(elems, true) in (res == r.next))
+decreases
+func (r *Ring) Next(ghost owner *Ring, ghost elems set[*Ring], ghost isInit bool) (res *Ring) {
+	unfold owner.Mem(elems, isInit)
+	if r.next == nil {
+		//# here we know !isInit
+		fold owner.Mem(elems, false)
+		return r.init(elems, false)
+	}
+	res = r.next
+	fold owner.Mem(elems, true)
+}
+
+
+// Prev returns the previous ring element. r must not be empty.
+requires r != nil
+requires r in elems
+requires owner.Mem(elems, isInit)
+ensures  !isInit ==> (owner.Mem(set[*Ring]{r}, true) && res == r) //# The comment does not explain that r is returned if the ring is not initialized but that's what the implementation does.
+ensures  isInit ==> owner.Mem(elems, true)
+ensures  isInit ==> (unfolding owner.Mem(elems, true) in (res == r.prev))
+decreases
+func (r *Ring) Prev(ghost owner *Ring, ghost elems set[*Ring], ghost isInit bool) (res *Ring) {
+	unfold owner.Mem(elems, isInit)
+	if r.next == nil {
+		//# here we know !isInit
+		fold owner.Mem(elems, false)
+		return r.init(elems, false)
+	}
+	res = r.prev
+	fold owner.Mem(elems, true)
+}
+
+
+ghost
+requires owner.Mem(elems,true)
+requires r in elems
+requires n >= 0
+ensures (n==0) ==> res==r 
+ensures (n>0) ==> res==(unfolding owner.Mem(elems,true) in r.next.moveNext(n-1, owner, elems)) 
+pure func (r *Ring) moveNext(n int, ghost owner *Ring, ghost elems set[*Ring]) (res * Ring){
+	return unfolding owner.Mem(elems,true) in ((n==0) ? r : r.next.moveNext(n-1, owner, elems))
+}
+
+/*
+//# TEST NEXT
+requires r.Mem(elems,true)
+requires r in elems
+ensures  r.Mem(elems, true)
+ensures  (res == r.moveNext(3, r, elems))
+func (r *Ring) moveNextTest(ghost elems set[*Ring]) (res *Ring){
+	unfold r.Mem(elems, true)
+	res = r.next.next.next
+	fold r.Mem(elems, true)
+}
+*/
+
+ghost
+requires owner.Mem(elems,true)
+requires r in elems
+requires n <= 0
+ensures (n==0) ==> res==r 
+ensures (n<0) ==> res==(unfolding owner.Mem(elems,true) in r.prev.movePrev(n+1, owner, elems)) 
+pure func (r *Ring) movePrev(n int, ghost owner *Ring, ghost elems set[*Ring]) (res * Ring){
+	return unfolding owner.Mem(elems,true) in ((n==0) ? r : r.prev.movePrev(n+1, owner, elems))
+}
+
+/*
+//# TEST PREV
+requires r.Mem(elems,true)
+requires r in elems
+ensures  r.Mem(elems, true)
+ensures  (res == r.movePrev(-3, r, elems))
+func (r *Ring) movePrevTest(ghost elems set[*Ring]) (res *Ring){
+	unfold r.Mem(elems, true)
+	res = r.prev.prev.prev
+	fold r.Mem(elems, true)
+}
+*/
+
+
+// Move moves n % r.Len() elements backward (n < 0) or forward (n >= 0)
+// in the ring and returns that ring element. r must not be empty.
+requires owner.Mem(elems, isInit) //# make this PRESERVES
+requires  r != nil
+requires  r in elems
+ensures   !isInit ==> (r.Mem(set[*Ring]{r}, true) && res == r) //# The comment does not explain that r is returned if the ring is not initialized but that's what the implementation does.
+ensures   (isInit && n == 0) ==> (res == r)
+//# how to reason that res is n steps away?
+ensures   (isInit && n>0) ==> (res == old(r.moveNext(n, owner, elems)))
+ensures   (isInit && n<0) ==> (res == old(r.movePrev(n, owner, elems)))
+//# Why does the implementation not make the modulo calculation and save on potentially unnecessary iterations? --> We'd need to run Len() (Len() many iterations) but for n > 2*Len() it'd still always make sense to compute the modulus
+func (r *Ring) Move(n int, ghost owner *Ring, ghost elems set[*Ring], ghost isInit bool) (res *Ring) {
+	if unfolding owner.Mem(elems, isInit) in r.next == nil {
+		return r.init(elems, isInit)
+	}
+
+    startRing := r  //# included for invariant
+    startN := n     //# included for invariant
+	switch {
+	case n < 0:
+		invariant n <= 0
+        invariant startRing.movePrev((startN - n), owner, elems) == r //# should we take old(r)?
+		for ; n < 0; n++ {
+			r = r.prev
+		}
+	case n > 0:
+		invariant n >= 0
+        invariant startRing.moveNext((startN - n), owner, elems) == r
+		for ; n > 0; n-- {
+			r = r.next
+		}
+	}
+	return r
+}
+
+
+/*
+// New creates a ring of n elements.
+func New(n int) *Ring {
+	if n <= 0 {
+		return nil
+	}
+	r := new(Ring)
+	p := r
+	for i := 1; i < n; i++ {
+		p.next = &Ring{prev: p}
+		p = p.next
+	}
+	p.next = r
+	r.prev = p
+	return r
+}
+
+// Link connects ring r with ring s such that r.Next()
+// becomes s and returns the original value for r.Next().
+// r must not be empty.
+//
+// If r and s point to the same ring, linking
+// them removes the elements between r and s from the ring.
+// The removed elements form a subring and the result is a
+// reference to that subring (if no elements were removed,
+// the result is still the original value for r.Next(),
+// and not nil).
+//
+// If r and s point to different rings, linking
+// them creates a single ring with the elements of s inserted
+// after r. The result points to the element following the
+// last element of s after insertion.
+func (r *Ring) Link(s *Ring) *Ring {
+	n := r.Next()
+	if s != nil {
+		p := s.Prev()
+		// Note: Cannot use multiple assignment because
+		// evaluation order of LHS is not specified.
+		r.next = s
+		s.prev = r
+		n.prev = p
+		p.next = n
+	}
+	return n
+}
+
+// Unlink removes n % r.Len() elements from the ring r, starting
+// at r.Next(). If n % r.Len() == 0, r remains unchanged.
+// The result is the removed subring. r must not be empty.
+func (r *Ring) Unlink(n int) *Ring {
+	if n <= 0 {
+		return nil
+	}
+	return r.Link(r.Move(n + 1))
+}
+
+// Len computes the number of elements in ring r.
+// It executes in time proportional to the number of elements.
+func (r *Ring) Len() int {
+	n := 0
+	if r != nil {
+		n = 1
+		for p := r.Next(); p != r; p = p.next {
+			n++
+		}
+	}
+	return n
+}
+
+// Do calls function f on each element of the ring, in forward order.
+// The behavior of Do is undefined if f changes *r.
+func (r *Ring) Do(f func(any)) {
+	if r != nil {
+		f(r.Value)
+		for p := r.Next(); p != r; p = p.next {
+			f(p.Value)
+		}
+	}
+}
+*/
