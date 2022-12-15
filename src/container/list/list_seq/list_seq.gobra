@@ -12,7 +12,7 @@
 
 // +gobra
 
-package list
+package list_seq
 
 // Element is an element of a linked list.
 type Element struct {
