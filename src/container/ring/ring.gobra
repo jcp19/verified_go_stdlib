@@ -26,6 +26,7 @@ pred (r *Ring) Mem(ghost s set[*Ring], ghost isInit bool) {
 	(isInit ==> (
 		(len(s)==1 ==> (r.next==r && r.prev==r)) &&
 		(forall i *Ring :: i in s ==> (i.next != nil && i.prev != nil)) &&
+		//((len(s) > 1) ==> (forall i *Ring :: i in s ==> (i.next != i && i.prev != i))) &&
 		(forall i, j *Ring :: ((i in s && i.next == j) ==> (j in s && j.prev == i && i.next.prev == i && j.prev.next == j))) &&
 		(forall i, j *Ring :: ((i in s && i.prev == j) ==> (j in s && j.next == i && i.prev.next == i && j.next.prev == j)))))
 }
@@ -47,42 +48,44 @@ func (r *Ring) init(ghost elems set[*Ring], ghost isInit bool) (res *Ring) {
 
 
 // Next returns the next ring element. r must not be empty.
+//# We use 'owner' here to make calls from different receivers in the same ring structure work (see e.g. Link)
 requires r != nil
 requires r in elems
-requires r.Mem(elems, isInit)
-ensures  !isInit ==> (r.Mem(set[*Ring]{r}, true) && res == r) //# The comment does not explain that r is returned if the ring is not initialized but that's what the implementation does.
-ensures  isInit ==> r.Mem(elems, true)
-ensures  isInit ==> (unfolding r.Mem(elems, true) in (res == r.next))
+requires owner.Mem(elems, isInit)
+ensures  !isInit ==> (owner.Mem(set[*Ring]{r}, true) && res == r) //# The comment does not explain that r is returned if the ring is not initialized but that's what the implementation does.
+ensures  isInit ==> (owner.Mem(elems, true) && res in elems)
+ensures  isInit ==> (unfolding owner.Mem(elems, true) in (res == r.next))
 decreases
-func (r *Ring) Next(ghost elems set[*Ring], ghost isInit bool) (res *Ring) {
-	unfold r.Mem(elems, isInit)
+func (r *Ring) Next(ghost elems set[*Ring], ghost owner *Ring, ghost isInit bool) (res *Ring) {
+	unfold owner.Mem(elems, isInit)
 	if r.next == nil {
 		//# here we know !isInit
-		fold r.Mem(elems, false)
+		fold owner.Mem(elems, false)
 		return r.init(elems, false)
 	}
 	res = r.next
-	fold r.Mem(elems, true)
+	fold owner.Mem(elems, true)
 }
 
 
 // Prev returns the previous ring element. r must not be empty.
+//# We use 'owner' here to make calls from different receivers in the same ring structure work (see e.g. Link)
 requires r != nil
 requires r in elems
-requires r.Mem(elems, isInit)
-ensures  !isInit ==> (r.Mem(set[*Ring]{r}, true) && res == r) //# The comment does not explain that r is returned if the ring is not initialized but that's what the implementation does.
-ensures  isInit ==> r.Mem(elems, true)
-ensures  isInit ==> (unfolding r.Mem(elems, true) in (res == r.prev))
+requires owner.Mem(elems, isInit)
+ensures  !isInit ==> (owner.Mem(set[*Ring]{r}, true) && res == r) //# The comment does not explain that r is returned if the ring is not initialized but that's what the implementation does.
+ensures  isInit ==> (owner.Mem(elems, true) && res in elems)
+ensures  isInit ==> (unfolding owner.Mem(elems, true) in (res == r.prev))
 decreases
-func (r *Ring) Prev(ghost elems set[*Ring], ghost isInit bool) (res *Ring) {
-	unfold r.Mem(elems, isInit)
+func (r *Ring) Prev(ghost elems set[*Ring], ghost owner *Ring, ghost isInit bool) (res *Ring) {
+	unfold owner.Mem(elems, isInit)
 	if r.next == nil {
 		//# here we know !isInit
-		fold r.Mem(elems, false)
+		fold owner.Mem(elems, false)
 		return r.init(elems, false)
 	}
 	res = r.prev
-	fold r.Mem(elems, true)
+	fold owner.Mem(elems, true)
 }
 
 
@@ -210,12 +213,15 @@ func New(n int) (res *Ring, ghost elems set[*Ring]) {
 		//# Implementation was changed. Every iteration we take a consistent ring and return a consistent ring with a new element.
 		unfold r.Mem(elems, true)
 		q := &Ring{}
+		//assume q != p
 		q.prev = p
 		q.next = p.next
 		q.prev.next = q
 		q.next.prev = q
 		p = q
 		elems = elems union set[*Ring]{p}
+		//assert p.next != p
+		//assert p.prev != p
 		fold r.Mem(elems, true)
 	}
 	
@@ -225,38 +231,60 @@ func New(n int) (res *Ring, ghost elems set[*Ring]) {
 	res = r
 }
 
-/*
+
 
 // Link connects ring r with ring s such that r.Next()
 // becomes s and returns the original value for r.Next().
 // r must not be empty.
 //
-// If r and s point to the same ring, linking
+// If r and s point to the same ring, linking 
 // them removes the elements between r and s from the ring.
 // The removed elements form a subring and the result is a
 // reference to that subring (if no elements were removed,
 // the result is still the original value for r.Next(),
 // and not nil).
+//#"Pointing to the same ring" here means to elements of the same ring structure
 //
 // If r and s point to different rings, linking
 // them creates a single ring with the elements of s inserted
 // after r. The result points to the element following the
 // last element of s after insertion.
-func (r *Ring) Link(s *Ring) (res *Ring) {
-	n := r.Next()
+//#This means likewise the result points to the original r.Next()
+requires r != nil
+requires r in elemsR
+requires r.Mem(elemsR, true)
+requires (s != nil && !(s in elemsR)) ==> (s.Mem(elemsS, true) && s in elemsS)
+//ensures  (!(s in elemsR)) ==> (res == old(unfolding r.Mem(elemsR, true) in r.next && res.Mem((elemsR union elemsS), true)))
+func (r *Ring) Link(s *Ring, ghost elemsR set[*Ring], ghost elemsS set[*Ring]) (res *Ring) {
+	n := r.Next(elemsR, r, true)
 	if s != nil {
-		p := s.Prev()
+		ghost elemsX := (s in elemsR)?(elemsR):(elemsS)
+		ghost owner := (s in elemsR)?(r):(s)
+		p := s.Prev(elemsX, owner, true)
 		// Note: Cannot use multiple assignment because
 		// evaluation order of LHS is not specified.
+		unfold r.Mem(elemsR, true)
+		ghost if !(s in elemsR){
+			unfold s.Mem(elemsS, true)
+		}
 		r.next = s
 		s.prev = r
-		n.prev = p
-		p.next = n
+		n.prev = p //# This only works due to the postcondition 'res in elems' in Next()
+		p.next = n //# This only works due to the postcondition 'res in elems' in Prev()
+		ghost if !(s in elemsR){
+			fold n.Mem((elemsR union elemsS), true)
+		}
+		/*ghost if (s in elemsR){
+			ghost if r==s && len(elemsR)>1{
+				fold n.Mem((elemsR setminus (set[*Ring]{r})), true)
+			}
+			//fold n.Mem((?????), true) //# elems needs to be all elements strictly between r and s, BUT WHAT IF r==s??
+		}*/
 	}
 	return n
 }
 
-
+/*
 // Unlink removes n % r.Len() elements from the ring r, starting
 // at r.Next(). If n % r.Len() == 0, r remains unchanged.
 // The result is the removed subring. r must not be empty.
