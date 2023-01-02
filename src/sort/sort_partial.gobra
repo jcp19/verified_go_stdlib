@@ -1,0 +1,221 @@
+// Copyright 2009 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+//go:generate go run gen_sort_variants.go
+
+// Package sort provides primitives for sorting slices and user-defined collections.
+// +gobra
+package sort
+
+//import "math/bits" //# Had to comment this out, otherwise verification progress does not go above 3%
+
+// An implementation of Interface can be sorted by the routines in this package.
+// The methods refer to elements of the underlying collection by integer index.
+type Interface interface {
+	pred Mem(ghost s seq[any])
+
+	// Len is the number of elements in the collection.
+	requires acc(Mem(elems), 1/2)
+	ensures  acc(Mem(elems), 1/2)
+	ensures  res == len(elems)
+	ensures  res >= 0
+	Len(ghost elems seq[any]) (res int)
+
+	// Less reports whether the element with index i
+	// must sort before the element with index j.
+	//
+	// If both Less(i, j) and Less(j, i) are false,
+	// then the elements at index i and j are considered equal. //# What does "considered equal mean"? We cannot use == in the spec since equality is relative to the defined order
+	// Sort may place equal elements in any order in the final result,
+	// while Stable preserves the original input order of equal elements.
+	//
+	// Less must describe a transitive ordering:
+	//  - if both Less(i, j) and Less(j, k) are true, then Less(i, k) must be true as well.
+	//  - if both Less(i, j) and Less(j, k) are false, then Less(i, k) must be false as well.
+	requires Mem(elems)
+	requires 0 <= i && i < len(elems)
+	requires 0 <= j && j < len(elems)
+	ensures  forall a, b, c int :: (0 <= a && a < len(elems) && 0 <= b && b < len(elems) && 0 <= c && c < len(elems) && less_spec(a,b,elems) && less_spec(b,c,elems)) ==> less_spec(a,c,elems)
+	pure less_spec(i, j int, ghost elems seq[any]) (res bool)
+	//
+	// Note that floating-point comparison (the < operator on float32 or float64 values)
+	// is not a transitive ordering when not-a-number (NaN) values are involved.
+	// See Float64Slice.Less for a correct implementation for floating-point values.
+	requires acc(Mem(elems), 1/2)
+	requires 0 <= i && i < len(elems)
+	requires 0 <= j && j < len(elems)
+	ensures  acc(Mem(elems), 1/2)
+	ensures  res == less_spec(i, j, elems)
+	Less(i, j int, ghost elems seq[any]) (res bool)
+
+	// Swap swaps the elements with indexes i and j.
+	requires Mem(elems)
+	requires 0 <= i && i < len(elems) //# possibly make Len() pure and use that
+	requires 0 <= j && j < len(elems) //# possibly make Len() pure and use that
+	ensures  Mem(swapped_elems)
+	ensures  len(elems) == len(swapped_elems) //# somehow this does not suffice to infer i and j are in range [0, len(swapped_elems)-1]
+	ensures  0 <= i && i < len(elems) && i < len(swapped_elems) //# possibly make Len() pure and use that
+	ensures  0 <= j && j < len(elems) && j < len(swapped_elems) //# possibly make Len() pure and use that
+	ensures  elems[i] === swapped_elems[j]
+	ensures  elems[j] === swapped_elems[i]
+	ensures  forall x int :: (0 <= x && x < len(elems) && x != i && x != j) ==> (elems[x] === swapped_elems[x])
+	Swap(i, j int, ghost elems seq[any]) (ghost swapped_elems seq[any])
+}
+
+
+//# LOTS IN BETWEEN.....
+
+ghost
+requires data != nil
+requires data.Mem(elems)
+requires 0 <= start && start < len(elems)
+requires start <= end && end < len(elems)
+ensures  (end - start <= 1) ==> res
+ensures  (end - start > 1 && !data.less_spec(end, end-1, elems)) ==> (res == isPartiallySorted(data, start, end-1, elems))
+ensures  (end - start > 1 &&  data.less_spec(end, end-1, elems)) ==> !res
+//ensures  res ==> (forall idx int :: ((start < idx && idx < end+1) ==> (!data.less_spec(idx, idx-1, elems)))) //# Would like to be able to infer that
+pure
+func isPartiallySorted(data Interface, start, end int, ghost elems seq[any]) (res bool) {
+	return (end - start <= 1) ? true : (!data.less_spec(end, end-1, elems) ? isPartiallySorted(data, start, end-1, elems) : false)
+}
+
+// IsSorted reports whether data is sorted.
+preserves data.Mem(elems)
+requires  data != nil
+ensures   res ==> (forall idx int :: ((0 < idx && idx < len(elems)) ==> (!data.less_spec(idx, idx-1, elems))))
+func IsSorted(data Interface, ghost elems seq[any]) (res bool) {
+	n := data.Len(elems)
+
+	res = true //# moved this up for use in the invariant
+
+	invariant i < n
+	invariant (len(elems) > 0) ==> (0 <= i) //# if n==0 then i==-1 after initialization
+	invariant data.Mem(elems)
+	invariant (res && len(elems) != 0) ==> (forall idx int :: ((i < idx && idx < len(elems)) ==> (!data.less_spec(idx, idx-1, elems))))
+	//invariant (res && len(elems) != 0) ==> isPartiallySorted(data, i, n-1, elems) //# Would like for this to hold here
+	decreases i
+	for i := n - 1; i > 0; i-- {
+		if data.Less(i, i-1, elems) {
+			res = false
+			return
+		}
+	}
+	return
+}
+
+// Convenience types for common cases
+
+// IntSlice attaches the methods of Interface to []int, sorting in increasing order.
+type IntSlice []int
+
+//# Adapted from Gobra tutorial
+ghost
+requires forall j int :: 0 <= j && j < len(s) ==> acc(&s[j],_)
+ensures len(res) == len(s)
+ensures forall j int :: {s[j]} {res[j]} 0 <= j && j < len(s) ==> s[j] == res[j]
+pure func toSeq(s []int) (res seq[any]) {
+  return (len(s) == 0 ? seq[any]{} :
+      toSeq(s[:len(s)-1]) ++ seq[any]{s[len(s) - 1]})
+}
+
+pred (x IntSlice) Mem(ghost s seq[any]){
+	len(x) == len(s) && //# If this is not the first line in the predicate, then we cannot verify e.g. the last postcondition in Len()
+	forall j int :: 0 <= j && j < len(x) ==> acc(&x[j]) &&
+	s == toSeq(x) &&
+	forall j int :: {x[j]} {s[j]} 0 <= j && j < len(s) ==> x[j] == s[j]
+}
+
+requires acc(x.Mem(elems), 1/2)
+ensures  acc(x.Mem(elems), 1/2)
+ensures  unfolding acc(x.Mem(elems), 1/2) in res == len(elems)
+ensures  res >= 0
+func (x IntSlice) Len(ghost elems seq[any]) (res int) {
+	return len(x)
+}
+
+requires x.Mem(elems)
+requires 0 <= i && i < len(elems)
+requires 0 <= j && j < len(elems)
+ensures  forall a, b, c int :: (0 <= a && a < len(elems) && 0 <= b && b < len(elems) && 0 <= c && c < len(elems) && x.less_spec(a,b,elems) && x.less_spec(b,c,elems)) ==> x.less_spec(a,c,elems)
+pure func (x IntSlice) less_spec(i, j int, ghost elems seq[any]) (res bool){
+	return unfolding x.Mem(elems) in x[i] < x[j]
+}
+
+
+requires acc(x.Mem(elems), 1/2)
+requires 0 <= i && i < len(elems)
+requires 0 <= j && j < len(elems)
+ensures  acc(x.Mem(elems), 1/2)
+ensures  res == x.less_spec(i, j, elems)
+func (x IntSlice) Less(i, j int, ghost elems seq[any]) (res bool) {
+	return unfolding acc(x.Mem(elems), 1/2) in x[i] < x[j]
+}
+
+requires x.Mem(elems)
+requires 0 <= i && i < len(elems)
+requires 0 <= j && j < len(elems)
+ensures  x.Mem(swapped_elems)
+ensures  len(elems) == len(swapped_elems) //# somehow this does not suffice to infer i and j are in range [0, len(swapped_elems)-1]
+ensures  0 <= i && i < len(elems) && i < len(swapped_elems) //# possibly make Len() pure and use that
+ensures  0 <= j && j < len(elems) && j < len(swapped_elems) //# possibly make Len() pure and use that
+//# These 3 lines are required..
+ensures  old(unfolding x.Mem(elems) in x[i]) === (unfolding x.Mem(swapped_elems) in x[j])
+ensures  old(unfolding x.Mem(elems) in x[j]) === (unfolding x.Mem(swapped_elems) in x[i])
+ensures  forall idx int :: (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (old(unfolding x.Mem(elems) in x[idx]) === (unfolding x.Mem(swapped_elems) in x[idx]))
+//# ..for these 3 corresponding lines to work. Why?
+ensures  elems[i] === swapped_elems[j]
+ensures  elems[j] === swapped_elems[i]
+ensures  forall idx int :: (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (elems[idx] === swapped_elems[idx])
+func (x IntSlice) Swap(i, j int, ghost elems seq[any]) (ghost swapped_elems seq[any]) {
+	unfold x.Mem(elems)
+	x[i], x[j] = x[j], x[i]
+	swapped_elems = toSeq(x)
+	fold x.Mem(swapped_elems)
+}
+
+//# implementation proof
+(IntSlice) implements Interface{ }
+
+
+
+// ######### BEGIN FROM zsortinterface ##############
+// insertionSort sorts data[a:b] using insertion sort.
+requires data.Mem(elems)
+requires data != nil
+requires 0 <= a && a < len(elems)
+requires a+1 < b && b <= len(elems) //# the element at position b does not get sorted
+ensures  data.Mem(sorted_elems)
+//ensures  isPartiallySorted(data, a, b-1, sorted_elems)
+func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted_elems seq[any]) {
+	sorted_elems = elems
+	assert data.Mem(sorted_elems)
+
+	invariant a < i && i <= b
+	invariant b <= len(sorted_elems)
+	invariant (a < b) ==> (i <= b)
+	invariant data.Mem(sorted_elems)
+	//invariant isPartiallySorted(data, a, i-1, sorted_elems)
+	decreases b-i
+	for i := a + 1; i < b; i++ { //# for any kind of sorting to happen b has to be at least a+2, does this mean if called with b=a+1 that this will not be sorted? Answer: YES, should we enforce that in the precondition?
+		invariant i < b
+		invariant b <= len(sorted_elems)
+		invariant a <= j && j <= i
+		invariant (a < j) ==> (0 <= j-1)
+		invariant data.Mem(sorted_elems)
+		//invariant isPartiallySorted(data, a, XXX, sorted_elems)
+		//invariant isPartiallySorted(data, YYY, i, sorted_elems)
+		decreases j-a
+		for j := i; j > a /*&& data.Less(j, j-1, elems)*/; j-- { //# Here it complains it could be j-1<0. But we know 0<a and a<=j and from the conjunction in this line we even know a<j. Problem with inline inference? 
+			assert 0 <= j-1
+			assert i < b
+			assert i < len(sorted_elems)
+			if data.Less(j, j-1, sorted_elems) {
+				sorted_elems = data.Swap(j, j-1, sorted_elems)
+			} else {
+				break
+			}
+		}
+	}
+}
+// ######### END FROM zsortinterface ##############
