@@ -101,7 +101,7 @@ func (l *List) Init(/*@ghost elems set[*Element], ghost isInit bool @*/) (res *L
 
 // New returns an initialized list.
 //@ ensures l.Mem(set[*Element]{&l.root}, true)
-//@ ensures  unfolding l.Mem(set[*Element]{&l.root}, true) in l.lenT==0
+//@ ensures unfolding l.Mem(set[*Element]{&l.root}, true) in l.lenT==0
 //@ decreases
 func New() (l *List) {
 	l = new(List)
