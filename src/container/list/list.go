@@ -106,7 +106,7 @@ func (l *List) Init(/*@ghost elems set[*Element], ghost isInit bool @*/) (res *L
 func New() (l *List) {
 	l = new(List)
 	//@ fold l.Mem(set[*Element]{&l.root}, false)
-	l.Init(/*@set[*Element]{&l.root}, false @*/)
+	l.Init(/*@ set[*Element]{&l.root}, false @*/)
 }
 
 // Len returns the number of elements of list l.
