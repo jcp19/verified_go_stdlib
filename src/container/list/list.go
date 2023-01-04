@@ -36,7 +36,7 @@ type Element struct {
 //@ ensures   unfolding list.Mem(elems, true) in (e.list == nil || e.next == &e.list.root) ==> res == nil
 //@ ensures   unfolding list.Mem(elems, true) in (e.list != nil && e.next != &e.list.root) ==> res == e.next
 //@ decreases
-func (e *Element) Next(/*@ghost elems set[*Element], ghost list *List @*/) (res *Element) {
+func (e *Element) Next(/*@ ghost elems set[*Element], ghost list *List @*/) (res *Element) {
 	//@ unfold list.Mem(elems, true)
 	//@ defer fold list.Mem(elems, true)
 	if p := e.next; e.list != nil && p != &e.list.root {
