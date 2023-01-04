@@ -51,7 +51,7 @@ func (e *Element) Next(/*@ ghost elems set[*Element], ghost list *List @*/) (res
 //@ ensures   unfolding list.Mem(elems, true) in (e.list == nil || e.prev == &e.list.root) ==> res == nil
 //@ ensures   unfolding list.Mem(elems, true) in (e.list != nil && e.prev != &e.list.root) ==> res == e.prev
 //@ decreases
-func (e *Element) Prev(/*@ghost elems set[*Element], ghost list *List @*/) (res *Element) {
+func (e *Element) Prev(/*@ ghost elems set[*Element], ghost list *List @*/) (res *Element) {
 	//@ unfold list.Mem(elems, true)
 	//@ defer fold list.Mem(elems, true)
 	if p := e.prev; e.list != nil && p != &e.list.root {
@@ -67,14 +67,12 @@ type List struct {
 	lenT int     // current list length excluding (this) sentinel element
 }
 
-
-
 /*@ pred (l *List) Mem(ghost s set[*Element], ghost isInit bool) {
 	acc(&l.lenT) &&
 	&l.root in s &&
-	(forall i *Element :: i in s ==> (acc(&i.next) && acc(&i.prev) && acc(&i.list) && acc(&i.Value))) && 
+	(forall i *Element :: i in s ==> (acc(&i.next) && acc(&i.prev) && acc(&i.list) && acc(&i.Value))) &&
 	((l.root.next == nil || l.root.prev == nil) ==> !isInit) &&
-	(!isInit ==> ((len(s)==1 && s == set[*Element]{&l.root}) && (l.root.next == nil && l.root.prev == nil))) &&
+	(!isInit ==> ((len(s) == 1 && s == set[*Element]{&l.root}) && (l.root.next == nil && l.root.prev == nil))) &&
 	(isInit ==> (
 		len(s) >= 1 &&
 		l.lenT == len(s)-1 &&
@@ -83,14 +81,13 @@ type List struct {
 		(forall i, j *Element :: ((i in s && i.prev == j) ==> (j in s && j.next == i && i.prev.next == i && j.next.prev == j)))))
 } @*/
 
-
 // Init initializes or clears list l.
 //@ requires l.Mem(elems, isInit)
 //@ ensures  res == l
 //@ ensures  l.Mem(set[*Element]{&l.root}, true)
 //@ ensures  unfolding l.Mem(set[*Element]{&l.root}, true) in l.lenT == 0
 //@ decreases
-func (l *List) Init(/*@ghost elems set[*Element], ghost isInit bool @*/) (res *List) {
+func (l *List) Init(/*@ ghost elems set[*Element], ghost isInit bool @*/) (res *List) {
 	//@ unfold l.Mem(elems, isInit)
 	l.root.next = &l.root
 	l.root.prev = &l.root
@@ -101,7 +98,7 @@ func (l *List) Init(/*@ghost elems set[*Element], ghost isInit bool @*/) (res *L
 
 // New returns an initialized list.
 //@ ensures l.Mem(set[*Element]{&l.root}, true)
-//@ ensures unfolding l.Mem(set[*Element]{&l.root}, true) in l.lenT==0
+//@ ensures unfolding l.Mem(set[*Element]{&l.root}, true) in l.lenT == 0
 //@ decreases
 func New() (l *List) {
 	l = new(List)
@@ -112,20 +109,20 @@ func New() (l *List) {
 // Len returns the number of elements of list l.
 // The complexity is O(1).
 //@ requires l.Mem(elems, true)
-//@ ensures  unfolding l.Mem(elems, true) in res==l.lenT
+//@ ensures  unfolding l.Mem(elems, true) in res == l.lenT
 //@ decreases
 //@ pure
-func (l *List) Len(/*@ghost elems set[*Element] @*/) (res int) {
+func (l *List) Len(/*@ ghost elems set[*Element] @*/) (res int) {
 	return /*@ unfolding l.Mem(elems, true) in @*/ l.lenT
 }
 
 // Front returns the first element of list l or nil if the list is empty.
-//@ preserves acc(l.Mem(elems, true),1/2)
+//@ preserves acc(l.Mem(elems, true), 1/2)
 //@ ensures   unfolding acc(l.Mem(elems, true), 1/2) in (l.lenT == 0 ==> res == nil) && (l.lenT != 0 ==> res == l.root.next)
 //@ decreases
 func (l *List) Front(/*@ ghost elems set[*Element] @*/) (res *Element) {
-	//@ unfold acc(l.Mem(elems, true),1/2)
-	//@ defer fold acc(l.Mem(elems, true),1/2)
+	//@ unfold acc(l.Mem(elems, true), 1/2)
+	//@ defer fold acc(l.Mem(elems, true), 1/2)
 	if l.lenT == 0 {
 		return nil
 	}
@@ -133,18 +130,17 @@ func (l *List) Front(/*@ ghost elems set[*Element] @*/) (res *Element) {
 }
 
 // Back returns the last element of list l or nil if the list is empty.
-//@ preserves acc(l.Mem(elems, true),1/2)
-//@ ensures   unfolding acc(l.Mem(elems, true),1/2) in ((l.lenT == 0) ==> res == nil) && ((l.lenT != 0) ==> res == l.root.prev)
+//@ preserves acc(l.Mem(elems, true), 1/2)
+//@ ensures   unfolding acc(l.Mem(elems, true), 1/2) in ((l.lenT == 0) ==> res == nil) && ((l.lenT != 0) ==> res == l.root.prev)
 //@ decreases
-func (l *List) Back(/*@ghost elems set[*Element] @*/) (res *Element) {
-	//@ unfold acc(l.Mem(elems, true),1/2)
-	//@ defer fold acc(l.Mem(elems, true),1/2)
+func (l *List) Back(/*@ ghost elems set[*Element] @*/) (res *Element) {
+	//@ unfold acc(l.Mem(elems, true), 1/2)
+	//@ defer fold acc(l.Mem(elems, true), 1/2)
 	if l.lenT == 0 {
 		return nil
 	}
 	return l.root.prev
 }
-
 
 // lazyInit lazily initializes a zero List value.
 //@ requires l.Mem(elems, isInit)
@@ -152,13 +148,13 @@ func (l *List) Back(/*@ghost elems set[*Element] @*/) (res *Element) {
 //@ ensures  isInit  ==> (unfolding l.Mem(elems, true) in l.lenT) == old(unfolding l.Mem(elems, true) in l.lenT)
 //@ ensures  !isInit ==> (unfolding l.Mem(elems, true) in l.lenT) == 0
 //@ decreases
-func (l *List) lazyInit(/*@ghost elems set[*Element], ghost isInit bool @*/) {
+func (l *List) lazyInit(/*@ ghost elems set[*Element], ghost isInit bool @*/) {
 	//@ unfold l.Mem(elems, isInit)
 
 	if l.root.next == nil {
 		//# Here isInit==false is implied
 		//@ fold l.Mem(elems, isInit)
-		l.Init(/*@elems, false @*/)
+		l.Init(/*@ elems, false @*/)
 		return //# Added this return because the fold only needs to happen in the else-case. Init already returns the predicate with isInit==true.
 	}
 	//@ fold l.Mem(elems, true)
@@ -172,10 +168,10 @@ func (l *List) lazyInit(/*@ghost elems set[*Element], ghost isInit bool @*/) {
 //@ ensures  l.Mem(elems union set[*Element]{e}, true)
 //@ ensures  (unfolding l.Mem(elems union set[*Element]{e}, true) in l.lenT) == (1 + old(unfolding l.Mem(elems, true) in l.lenT)) //# mention increment explicitly
 //@ ensures  unfolding l.Mem(elems union set[*Element]{e}, true) in (at.next == e && e.prev == at)
-//@ ensures  unfolding l.Mem(elems union set[*Element]{e}, true) in (old(unfolding l.Mem(elems,true) in at.next).prev == e && e.next == old(unfolding l.Mem(elems,true) in at.next)) //# included to help us reason about the inserted element in PushBack, InsertBefore
+//@ ensures  unfolding l.Mem(elems union set[*Element]{e}, true) in (old(unfolding l.Mem(elems, true) in at.next).prev == e && e.next == old(unfolding l.Mem(elems, true) in at.next)) //# included to help us reason about the inserted element in PushBack, InsertBefore
 //@ ensures  res == e
 //@ decreases
-func (l *List) insert(e, at *Element/*@, ghost elems set[*Element] @*/) (res *Element) {
+func (l *List) insert(e, at *Element /*@, ghost elems set[*Element] @*/) (res *Element) {
 	//@ unfold l.Mem(elems, true)
 	e.prev = at
 	e.next = at.next
@@ -193,26 +189,25 @@ func (l *List) insert(e, at *Element/*@, ghost elems set[*Element] @*/) (res *El
 //@ ensures  l.Mem(elems union set[*Element]{res}, true)
 //@ ensures  (unfolding l.Mem(elems union set[*Element]{res}, true) in l.lenT) == (1 + old(unfolding l.Mem(elems, true) in l.lenT)) //# mention increment explicitly
 //@ ensures  unfolding l.Mem(elems union set[*Element]{res}, true) in (at.next == res && res.prev == at)
-//@ ensures  unfolding l.Mem(elems union set[*Element]{res}, true) in (old(unfolding l.Mem(elems,true) in at.next).prev == res && res.next == old(unfolding l.Mem(elems,true) in at.next)) //# included to help us reason about the inserted element in PushBack, InsertBefore
+//@ ensures  unfolding l.Mem(elems union set[*Element]{res}, true) in (old(unfolding l.Mem(elems, true) in at.next).prev == res && res.next == old(unfolding l.Mem(elems, true) in at.next)) //# included to help us reason about the inserted element in PushBack, InsertBefore
 //@ decreases
-func (l *List) insertValue(v any, at *Element/*@, ghost elems set[*Element] @*/) (res *Element) {
+func (l *List) insertValue(v any, at *Element /*@, ghost elems set[*Element] @*/) (res *Element) {
 	res = &Element{Value: v}
 	//@ assume !(res in elems)
 	//# The above assumption is necessary for insert's precondition: The element to be inserted cannot already be in the list
 	//# The above assumption is safe because the element gets created right here and we therefore know that the element is not already in the list
-	return l.insert(res, at/*@, elems @*/)
+	return l.insert(res, at /*@, elems @*/)
 }
 
-
-//@ requires l.Mem(elems,true)
+//@ requires l.Mem(elems, true)
 //@ requires e in elems
 //@ requires e != &l.root
-//@ ensures  l.Mem((elems setminus (set[*Element]{e})),true)
+//@ ensures  l.Mem((elems setminus (set[*Element]{e})), true)
 //@ ensures  !(e in (elems setminus (set[*Element]{e})))
-//@ ensures  (unfolding l.Mem((elems setminus (set[*Element]{e})),true) in l.lenT) == (old(unfolding l.Mem(elems, true) in l.lenT) - 1) //# mention decrement explicitly
+//@ ensures  (unfolding l.Mem((elems setminus (set[*Element]{e})), true) in l.lenT) == (old(unfolding l.Mem(elems, true) in l.lenT) - 1) //# mention decrement explicitly
 //@ ensures  acc(e) && e.list == nil
 //@ decreases
-func (l *List) remove(e *Element/*@, ghost elems set[*Element] @*/) {
+func (l *List) remove(e *Element /*@, ghost elems set[*Element] @*/) {
 	//@ unfold l.Mem(elems, true)
 	e.prev.next = e.next
 	e.next.prev = e.prev
@@ -223,8 +218,6 @@ func (l *List) remove(e *Element/*@, ghost elems set[*Element] @*/) {
 	//@ fold l.Mem((elems setminus (set[*Element]{e})), true)
 }
 
-
-
 // move moves e to next to at.
 //@ requires l.Mem(elems, true)
 //@ requires e in elems
@@ -233,10 +226,10 @@ func (l *List) remove(e *Element/*@, ghost elems set[*Element] @*/) {
 //@ ensures  (e != at ==> (unfolding l.Mem(elems, true) in (at.next == e && e.prev == at)))
 //# The next two lines are intended to help us reason about the element's position after it has been moved.
 //# Verification just for these additional 2 lines takes more than 1 hour on my machine. I will uncomment and test this as soon as the rest is done.
-//ensures  ((e != at && old(unfolding l.Mem(elems,true) in at.next != e)) ==> (unfolding l.Mem(elems, true) in (e.next == old(unfolding l.Mem(elems,true) in at.next)))) //# included to help us reason about the moved element in MoveToBack, MoveBefore
-//ensures  ((e != at && old(unfolding l.Mem(elems,true) in at.next != e)) ==> (unfolding l.Mem(elems, true) in (old(unfolding l.Mem(elems,true) in at.next).prev == e))) //# included to help us reason about the moved element in MoveToBack, MoveBefore
-decreases
-func (l *List) move(e, at *Element/*@, ghost elems set[*Element] @*/) {
+// ensures  ((e != at && old(unfolding l.Mem(elems, true) in at.next != e)) ==> (unfolding l.Mem(elems, true) in (e.next == old(unfolding l.Mem(elems, true) in at.next)))) //# included to help us reason about the moved element in MoveToBack, MoveBefore
+// ensures  ((e != at && old(unfolding l.Mem(elems, true) in at.next != e)) ==> (unfolding l.Mem(elems, true) in (old(unfolding l.Mem(elems, true) in at.next).prev == e))) //# included to help us reason about the moved element in MoveToBack, MoveBefore
+//@ decreases
+func (l *List) move(e, at *Element /*@, ghost elems set[*Element] @*/) {
 	if e == at {
 		return
 	}
@@ -254,15 +247,13 @@ func (l *List) move(e, at *Element/*@, ghost elems set[*Element] @*/) {
 	//@ fold l.Mem(elems, true)
 }
 
-
-
 // Remove removes e from l if e is an element of list l.
 // It returns the element value e.Value.
 // The element must not be nil.
 //@ requires e != nil
 //@ requires l.Mem(elems, true)
 //@ requires e != &l.root
-//@ requires !(e in elems) ==> (elems == (elems setminus (set[*Element]{e}))) //# After the branch, we don't know wheter the element was originally in the list, we do this, so 
+//@ requires !(e in elems) ==> (elems == (elems setminus (set[*Element]{e}))) //# After the branch, we don't know wheter the element was originally in the list, we do this, so
 //# The next three lines aim to establish: (e.list == l) IFF (e in elems)
 //@ requires !(e in elems) ==> (acc(e) && e.list != l)
 //@ requires (e in elems) ==> (unfolding l.Mem(elems, true) in e.list == l)
@@ -271,54 +262,49 @@ func (l *List) move(e, at *Element/*@, ghost elems set[*Element] @*/) {
 //@ ensures  (e in elems) ==> (l.Mem((elems setminus (set[*Element]{e})), true) && !(e in (elems setminus (set[*Element]{e}))))
 //@ ensures  acc(e) && e.Value === res && (e in elems ==> e.list == nil)
 //@ decreases
-func (l *List) Remove(e *Element/*@, ghost elems set[*Element] @*/) (res any) {
-	/*@ghost if e in elems{
+func (l *List) Remove(e *Element /*@, ghost elems set[*Element] @*/) (res any) {
+	/*@ ghost if e in elems{
 		unfold l.Mem(elems, true)
-	}@*/
+	} @*/
 
 	if e.list == l {
 		// if e.list == l, l must have been initialized when e was inserted
 		// in l or l == nil (e is a zero Element) and l.remove will crash
 		//@ fold l.Mem(elems, true)
-		l.remove(e/*@, elems @*/)
+		l.remove(e /*@, elems @*/)
 	}
 
 	return e.Value
 }
-
-
 
 // PushFront inserts a new element e with value v at the front of list l and returns e.
 //@ requires l.Mem(elems, isInit)
 //@ ensures  l.Mem(elems union set[*Element]{res}, true)
 //@ ensures  isInit ==> ((unfolding l.Mem(elems union set[*Element]{res}, true) in l.lenT) == (1 + old(unfolding l.Mem(elems, true) in l.lenT))) //# mention increment explicitly
 //@ ensures  !isInit ==> ((unfolding l.Mem(elems union set[*Element]{res}, true) in l.lenT) == 1)
-//@ ensures  unfolding l.Mem(elems union set[*Element]{res}, true) in (l.root.next==res && res.prev == &l.root)
+//@ ensures  unfolding l.Mem(elems union set[*Element]{res}, true) in (l.root.next == res && res.prev == &l.root)
 //@ decreases
-func (l *List) PushFront(v any/*@, ghost elems set[*Element], ghost isInit bool @*/) (res *Element) {
-	l.lazyInit(/*@elems, isInit @*/)
-	res = l.insertValue(v, &l.root/*@, elems @*/)
+func (l *List) PushFront(v any /*@, ghost elems set[*Element], ghost isInit bool @*/) (res *Element) {
+	l.lazyInit(/*@ elems, isInit @*/)
+	res = l.insertValue(v, &l.root /*@, elems @*/)
 }
-
-
 
 // PushBack inserts a new element e with value v at the back of list l and returns e.
 //@ requires l.Mem(elems, isInit)
 //@ ensures  l.Mem(elems union set[*Element]{res}, true)
 //@ ensures  isInit ==> ((unfolding l.Mem(elems union set[*Element]{res}, true) in l.lenT) == (1 + old(unfolding l.Mem(elems, true) in l.lenT))) //# mention increment explicitly
 //@ ensures  !isInit ==> ((unfolding l.Mem(elems union set[*Element]{res}, true) in l.lenT) == 1)
-//@ ensures  unfolding l.Mem(elems union set[*Element]{res}, true) in (res.next==&l.root && l.root.prev==res) //# This is what we want to know about res' position
+//@ ensures  unfolding l.Mem(elems union set[*Element]{res}, true) in (res.next == &l.root && l.root.prev == res) //# This is what we want to know about res' position
 //@ decreases
-func (l *List) PushBack(v any/*@, ghost elems set[*Element], ghost isInit bool @*/) (res *Element) {
-	l.lazyInit(elems, isInit)
+func (l *List) PushBack(v any /*@, ghost elems set[*Element], ghost isInit bool @*/) (res *Element) {
+	l.lazyInit(/*@ elems, isInit @*/)
 
 	//@ unfold l.Mem(elems, true)
 	back := l.root.prev //# Have to have this because 'insertValue' requires folded predicate but we need permission to l.root.prev
 	//@ fold l.Mem(elems, true)
 
-	return l.insertValue(v, back/*@, elems @*/) //# See comment above: originally instead of back, it was l.root.prev
+	return l.insertValue(v, back /*@, elems @*/) //# See comment above: originally instead of back, it was l.root.prev
 }
-
 
 // InsertBefore inserts a new element e with value v immediately before mark and returns e.
 // If mark is not an element of l, the list is not modified.
@@ -332,9 +318,9 @@ func (l *List) PushBack(v any/*@, ghost elems set[*Element], ghost isInit bool @
 
 //@ ensures  (mark in elems) ==> l.Mem(elems union set[*Element]{res}, true)
 //@ ensures  !(mark in elems) ==> l.Mem(elems, true)
-//@ ensures  (mark in elems) ==> (unfolding l.Mem(elems union set[*Element]{res}, true) in (mark.prev == res && res.next==mark))  //# This is what we want to know about res' position
+//@ ensures  (mark in elems) ==> (unfolding l.Mem(elems union set[*Element]{res}, true) in (mark.prev == res && res.next == mark))  //# This is what we want to know about res' position
 //@ decreases
-func (l *List) InsertBefore(v any, mark *Element/*@, ghost elems set[*Element] @*/) (res *Element) {
+func (l *List) InsertBefore(v any, mark *Element /*@, ghost elems set[*Element] @*/) (res *Element) {
 	//@ unfold l.Mem(elems, true)
 	if mark.list != l {
 		//@ fold l.Mem(elems, true)
@@ -343,9 +329,8 @@ func (l *List) InsertBefore(v any, mark *Element/*@, ghost elems set[*Element] @
 	markPrev := mark.prev //# Have to have this because we 'insertValue' requires folded predicate but we need permission to mark.prev
 	//@ fold l.Mem(elems, true)
 	// see comment in List.Remove about initialization of l
-	return l.insertValue(v, markPrev/*@, elems @*/)
+	return l.insertValue(v, markPrev /*@, elems @*/)
 }
-
 
 // InsertAfter inserts a new element e with value v immediately after mark and returns e.
 // If mark is not an element of l, the list is not modified.
@@ -359,9 +344,9 @@ func (l *List) InsertBefore(v any, mark *Element/*@, ghost elems set[*Element] @
 
 //@ ensures  (mark in elems) ==> l.Mem(elems union set[*Element]{res}, true)
 //@ ensures  !(mark in elems) ==> l.Mem(elems, true)
-//@ ensures  (mark in elems) ==> (unfolding l.Mem(elems union set[*Element]{res}, true) in (mark.next==res && res.prev == mark))
+//@ ensures  (mark in elems) ==> (unfolding l.Mem(elems union set[*Element]{res}, true) in (mark.next == res && res.prev == mark))
 //@ decreases
-func (l *List) InsertAfter(v any, mark *Element/*@, ghost elems set[*Element] @*/) (res *Element) {
+func (l *List) InsertAfter(v any, mark *Element /*@, ghost elems set[*Element] @*/) (res *Element) {
 	//@ unfold l.Mem(elems, true)
 	if mark.list != l {
 		//@ fold l.Mem(elems, true)
@@ -369,9 +354,8 @@ func (l *List) InsertAfter(v any, mark *Element/*@, ghost elems set[*Element] @*
 	}
 	//@ fold l.Mem(elems, true)
 	// see comment in List.Remove about initialization of l
-	return l.insertValue(v, mark/*@, elems @*/)
+	return l.insertValue(v, mark /*@, elems @*/)
 }
-
 
 // MoveToFront moves element e to the front of list l.
 // If e is not an element of l, the list is not modified.
@@ -384,9 +368,9 @@ func (l *List) InsertAfter(v any, mark *Element/*@, ghost elems set[*Element] @*
 //@ requires (e in elems) ==> (unfolding l.Mem(elems, true) in e.list == l)
 //@ requires unfolding l.Mem(elems, true) in ((e.list == l ==> e in elems) && ((e.list != l) ==> !(e in elems)))
 //@ ensures  l.Mem(elems, true)
-//@ ensures  (e in elems) ==> (unfolding l.Mem(elems, true) in (l.root.next==e && e.prev == &l.root))
+//@ ensures  (e in elems) ==> (unfolding l.Mem(elems, true) in (l.root.next == e && e.prev == &l.root))
 //@ decreases
-func (l *List) MoveToFront(e *Element/*@, ghost elems set[*Element] @*/) {
+func (l *List) MoveToFront(e *Element /*@, ghost elems set[*Element] @*/) {
 	//@ unfold l.Mem(elems, true)
 	if e.list != l || l.root.next == e {
 		//@ fold l.Mem(elems, true)
@@ -394,9 +378,8 @@ func (l *List) MoveToFront(e *Element/*@, ghost elems set[*Element] @*/) {
 	}
 	//@ fold l.Mem(elems, true)
 	// see comment in List.Remove about initialization of l
-	l.move(e, &l.root/*@, elems @*/)
+	l.move(e, &l.root /*@, elems @*/)
 }
-
 
 // MoveToBack moves element e to the back of list l.
 // If e is not an element of l, the list is not modified.
@@ -410,19 +393,17 @@ func (l *List) MoveToFront(e *Element/*@, ghost elems set[*Element] @*/) {
 //@ ensures  l.Mem(elems, true)
 //# We still need to reason about e's position after the move.
 //@ decreases
-func (l *List) MoveToBack(e *Element/*@, ghost elems set[*Element] @*/) {
-	//@ unfold l.Mem(elems,true)
+func (l *List) MoveToBack(e *Element /*@, ghost elems set[*Element] @*/) {
+	//@ unfold l.Mem(elems, true)
 	if e.list != l || l.root.prev == e {
-		//@ fold l.Mem(elems,true)
+		//@ fold l.Mem(elems, true)
 		return
 	}
 	back := l.root.prev //# Have to have this because 'insertValue' requires folded predicate but we need permission to l.root.prev.
-	//@ fold l.Mem(elems,true)
+	//@ fold l.Mem(elems, true)
 	// see comment in List.Remove about initialization of l
-	l.move(e, back/*@, elems @*/)
+	l.move(e, back /*@, elems @*/)
 }
-
-
 
 // MoveBefore moves element e to its new position before mark.
 // If e or mark is not an element of l, or e == mark, the list is not modified.
@@ -441,7 +422,7 @@ func (l *List) MoveToBack(e *Element/*@, ghost elems set[*Element] @*/) {
 //@ ensures  l.Mem(elems, true)
 //# We still need to reason about e's position after the move.
 //@ decreases
-func (l *List) MoveBefore(e, mark *Element/*@, ghost elems set[*Element] @*/) {
+func (l *List) MoveBefore(e, mark *Element /*@, ghost elems set[*Element] @*/) {
 	//@ unfold l.Mem(elems, true)
 	if e.list != l || e == mark || mark.list != l {
 		//@ fold l.Mem(elems, true)
@@ -449,9 +430,8 @@ func (l *List) MoveBefore(e, mark *Element/*@, ghost elems set[*Element] @*/) {
 	}
 	markPrev := mark.prev
 	//@ fold l.Mem(elems, true)
-	l.move(e, markPrev/*@, elems @*/)
+	l.move(e, markPrev /*@, elems @*/)
 }
-
 
 // MoveAfter moves element e to its new position after mark.
 // If e or mark is not an element of l, or e == mark, the list is not modified.
@@ -470,44 +450,41 @@ func (l *List) MoveBefore(e, mark *Element/*@, ghost elems set[*Element] @*/) {
 //@ ensures  l.Mem(elems, true)
 //@ ensures  (mark != e && e in elems && mark in elems) ==> (unfolding l.Mem(elems, true) in (mark.next == e && e.prev == mark))
 //@ decreases
-func (l *List) MoveAfter(e, mark *Element/*@, ghost elems set[*Element] @*/) {
+func (l *List) MoveAfter(e, mark *Element /*@, ghost elems set[*Element] @*/) {
 	//@ unfold l.Mem(elems, true)
 	if e.list != l || e == mark || mark.list != l {
 		//@ fold l.Mem(elems, true)
 		return
 	}
 	//@ fold l.Mem(elems, true)
-	l.move(e, mark/*@, elems @*/)
+	l.move(e, mark /*@, elems @*/)
 }
-
-
 
 // PushBackList inserts a copy of another list at the back of list l.
 // The lists l and other may be the same. They must not be nil.
 //@ requires false
-func (l *List) PushBackList(other *List/*@, ghost elemsL set[*Element], ghost elemsOther set[*Element], ghost isInit bool @*/) {
-	l.lazyInit(elemsL/*@, isInit @*/)
+func (l *List) PushBackList(other *List /*@, ghost elemsL set[*Element], ghost elemsOther set[*Element], ghost isInit bool @*/) {
+	l.lazyInit(/*@ elemsL, isInit @*/)
 
 	for i, e := other.Len(/*@elemsOther @*/), other.Front(/*@elemsOther @*/); i > 0; i, e = i-1, e.Next(/*@elemsOther, other @*/) {
-		l.insertValue(e.Value, l.root.prev/*@, elemsL @*/)
+		l.insertValue(e.Value, l.root.prev /*@, elemsL @*/)
 	}
 }
-
 
 // PushFrontList inserts a copy of another list at the front of list l.
 // The lists l and other may be the same. They must not be nil.
 //@ requires false
 //@ requires l.Mem(elemsL,isInit)
-//@ requires (l==other) ==> (elemsL==elemsOther)
-//@ requires (l!=other) ==> (other.Mem(elemsOther,true))
-func (l *List) PushFrontList(other *List/*@, ghost elemsL set[*Element], ghost elemsOther set[*Element], ghost isInit bool @*/) {
+//@ requires (l == other) ==> (elemsL == elemsOther)
+//@ requires (l != other) ==> (other.Mem(elemsOther, true))
+func (l *List) PushFrontList(other *List /*@, ghost elemsL set[*Element], ghost elemsOther set[*Element], ghost isInit bool @*/) {
 	l.lazyInit(/*@elemsL, isInit @*/)
-	//@ assert l.Mem(elemsL,true)
+	//@ assert l.Mem(elemsL, true)
 
 	for i, e := other.Len(/*@elemsOther @*/), other.Back(/*@elemsOther @*/); i > 0; i, e = i-1, e.Prev(/*@elemsOther, other @*/) {
-		//@ unfold other.Mem(elemsOther,true) //# different if l==other
+		//@ unfold other.Mem(elemsOther, true) //# different if l==other
 		eValue := e.Value
-		//@ fold other.Mem(elemsOther,true) //# different if l==other
-		newElem := l.insertValue(eValue, &l.root/*@, elemsL @*/)
+		//@ fold other.Mem(elemsOther, true) //# different if l==other
+		newElem := l.insertValue(eValue, &l.root /*@, elemsL @*/)
 	}
 }
