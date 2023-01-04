@@ -40,7 +40,7 @@ jobs:
         uses: viperproject/gobra-action@main
         with:
           packages: 'src/container/list'
-          timeout: 10m
+          timeout: 40m
           headerOnly: ${{ env.headerOnly }}
           includePaths: ${{ env.includePaths }}
           assumeInjectivityOnInhale: ${{ env.assumeInjectivityOnInhale }}
