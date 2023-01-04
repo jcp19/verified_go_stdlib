@@ -121,7 +121,7 @@ func (l *List) Len(/*@ghost elems set[*Element] @*/) (res int) {
 
 // Front returns the first element of list l or nil if the list is empty.
 //@ preserves acc(l.Mem(elems, true),1/2)
-//@ ensures   unfolding acc(l.Mem(elems, true),1/2) in ((l.lenT == 0) ==> res == nil) && ((l.lenT != 0) ==> res == l.root.next)
+//@ ensures   unfolding acc(l.Mem(elems, true), 1/2) in (l.lenT == 0 ==> res == nil) && (l.lenT != 0 ==> res == l.root.next)
 //@ decreases
 func (l *List) Front(/*@ghost elems set[*Element] @*/) (res *Element) {
 	//@ unfold acc(l.Mem(elems, true),1/2)
