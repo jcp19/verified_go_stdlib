@@ -123,7 +123,7 @@ func (l *List) Len(/*@ghost elems set[*Element] @*/) (res int) {
 //@ preserves acc(l.Mem(elems, true),1/2)
 //@ ensures   unfolding acc(l.Mem(elems, true), 1/2) in (l.lenT == 0 ==> res == nil) && (l.lenT != 0 ==> res == l.root.next)
 //@ decreases
-func (l *List) Front(/*@ghost elems set[*Element] @*/) (res *Element) {
+func (l *List) Front(/*@ ghost elems set[*Element] @*/) (res *Element) {
 	//@ unfold acc(l.Mem(elems, true),1/2)
 	//@ defer fold acc(l.Mem(elems, true),1/2)
 	if l.lenT == 0 {
