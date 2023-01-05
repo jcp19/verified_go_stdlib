@@ -65,21 +65,9 @@ func (e *Element) Prev(/*@ ghost elems set[*Element], ghost list *List @*/) (res
 type List struct {
 	root Element // sentinel list element, only &root, root.prev, and root.next are used
 	lenT int     // current list length excluding (this) sentinel element
+	//# The original implementation used 'len' as a field name. This was changed to 'lenT' because 'len' serves as a keyword in Gobra, see https://github.com/viperproject/gobra/issues/118
 }
 
-/*@ pred (l *List) Mem(ghost s set[*Element], ghost isInit bool) {
-	acc(&l.lenT) &&
-	&l.root in s &&
-	(forall i *Element :: i in s ==> (acc(&i.next) && acc(&i.prev) && acc(&i.list) && acc(&i.Value))) &&
-	((l.root.next == nil || l.root.prev == nil) ==> !isInit) &&
-	(!isInit ==> ((len(s) == 1 && s == set[*Element]{&l.root}) && (l.root.next == nil && l.root.prev == nil))) &&
-	(isInit ==> (
-		len(s) >= 1 &&
-		l.lenT == len(s)-1 &&
-		(forall i *Element :: i in s ==> (i.next != nil && i.prev != nil && (i != &l.root ==> i.list == l))) &&
-		(forall i, j *Element :: ((i in s && i.next == j) ==> (j in s && j.prev == i && i.next.prev == i && j.prev.next == j))) &&
-		(forall i, j *Element :: ((i in s && i.prev == j) ==> (j in s && j.next == i && i.prev.next == i && j.next.prev == j)))))
-} @*/
 
 // Init initializes or clears list l.
 //@ requires l.Mem(elems, isInit)
@@ -117,12 +105,13 @@ func (l *List) Len(/*@ ghost elems set[*Element], isInit bool @*/) (res int) {
 }
 
 // Front returns the first element of list l or nil if the list is empty.
-//@ preserves acc(l.Mem(elems, true), 1/2)
-//@ ensures   (l.Len(elems, true) == 0 ==> res == nil) && (l.Len(elems, true) != 0 ==> res == (unfolding acc(l.Mem(elems, true), 1/2) in l.root.next))
+//@ preserves acc(l.Mem(elems, true), ReadPerm)
+//@ ensures   l.Len(elems, true) == 0 ==> res == nil
+//@ ensures   l.Len(elems, true) != 0 ==> res == (unfolding acc(l.Mem(elems, true), ReadPerm) in l.root.next)
 //@ decreases
 func (l *List) Front(/*@ ghost elems set[*Element] @*/) (res *Element) {
-	//@ unfold acc(l.Mem(elems, true), 1/2)
-	//@ defer fold acc(l.Mem(elems, true), 1/2)
+	//@ unfold acc(l.Mem(elems, true), ReadPerm)
+	//@ defer fold acc(l.Mem(elems, true), ReadPerm)
 	if l.lenT == 0 {
 		return nil
 	}
@@ -130,12 +119,13 @@ func (l *List) Front(/*@ ghost elems set[*Element] @*/) (res *Element) {
 }
 
 // Back returns the last element of list l or nil if the list is empty.
-//@ preserves acc(l.Mem(elems, true), 1/2)
-//@ ensures   (l.Len(elems, true) == 0 ==> res == nil) && (l.Len(elems, true) != 0 ==> res == (unfolding acc(l.Mem(elems, true), 1/2) in l.root.prev))
+//@ preserves acc(l.Mem(elems, true), ReadPerm)
+//@ ensures   l.Len(elems, true) == 0 ==> res == nil
+//@ ensures   l.Len(elems, true) != 0 ==> res == (unfolding acc(l.Mem(elems, true), ReadPerm) in l.root.prev)
 //@ decreases
 func (l *List) Back(/*@ ghost elems set[*Element] @*/) (res *Element) {
-	//@ unfold acc(l.Mem(elems, true), 1/2)
-	//@ defer fold acc(l.Mem(elems, true), 1/2)
+	//@ unfold acc(l.Mem(elems, true), ReadPerm)
+	//@ defer fold acc(l.Mem(elems, true), ReadPerm)
 	if l.lenT == 0 {
 		return nil
 	}
@@ -195,9 +185,8 @@ func (l *List) insert(e, at *Element /*@, ghost elems set[*Element] @*/) (res *E
 //@ decreases
 func (l *List) insertValue(v any, at *Element /*@, ghost elems set[*Element] @*/) (res *Element) {
 	res = &Element{Value: v}
-	//@ assume !(res in elems)
-	//# The above assumption is necessary for insert's precondition: The element to be inserted cannot already be in the list
-	//# The above assumption is safe because the element gets created right here and we therefore know that the element is not already in the list
+	//@ assert unfolding l.Mem(elems, true) in !(res in elems)
+	//# The above assertion serves a trigger for the precondition of 'insert'
 	return l.insert(res, at /*@, elems @*/)
 }
 
