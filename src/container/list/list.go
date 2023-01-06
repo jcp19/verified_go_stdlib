@@ -32,9 +32,10 @@ type Element struct {
 
 // Next returns the next list element or nil.
 //@ preserves list.Mem(elems, true)
+//@ requires  e != &list.root
 //@ requires  e in elems //# Via the predicate, this already implies that e.list==nil cannot happen
-//@ ensures   unfolding list.Mem(elems, true) in (e.list == nil || e.next == &e.list.root) ==> res == nil
-//@ ensures   unfolding list.Mem(elems, true) in (e.list != nil && e.next != &e.list.root) ==> res == e.next
+//@ ensures   unfolding list.Mem(elems, true) in (e.next == &e.list.root) ==> res == nil
+//@ ensures   unfolding list.Mem(elems, true) in (e.next != &e.list.root) ==> res == e.next
 //@ decreases
 func (e *Element) Next(/*@ ghost elems set[*Element], ghost list *List @*/) (res *Element) {
 	//@ unfold list.Mem(elems, true)
@@ -47,9 +48,10 @@ func (e *Element) Next(/*@ ghost elems set[*Element], ghost list *List @*/) (res
 
 // Prev returns the previous list element or nil.
 //@ preserves list.Mem(elems, true)
+//@ requires  e != &list.root
 //@ requires  e in elems //# Via the predicate, this already implies that e.list==nil cannot happen
-//@ ensures   unfolding list.Mem(elems, true) in (e.list == nil || e.prev == &e.list.root) ==> res == nil
-//@ ensures   unfolding list.Mem(elems, true) in (e.list != nil && e.prev != &e.list.root) ==> res == e.prev
+//@ ensures   unfolding list.Mem(elems, true) in (e.prev == &e.list.root) ==> res == nil
+//@ ensures   unfolding list.Mem(elems, true) in (e.prev != &e.list.root) ==> res == e.prev
 //@ decreases
 func (e *Element) Prev(/*@ ghost elems set[*Element], ghost list *List @*/) (res *Element) {
 	//@ unfold list.Mem(elems, true)
