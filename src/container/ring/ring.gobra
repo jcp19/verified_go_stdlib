@@ -247,13 +247,9 @@ func New(n int) (res *Ring, ghost elems set[*Ring]) {
 		assert p.prev == q
 		assert q.next == p
 	}
-
-
 	p.next = r
 	r.prev = p
-	
-
-	res = r
+	return r
 }
 
 /*
