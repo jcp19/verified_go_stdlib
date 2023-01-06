@@ -18,22 +18,23 @@ type Ring struct {
 }
 
 
+//# Will be properly documented and moved to a separate ring_spec.gobra file
 pred (r *Ring) Mem(ghost s set[*Ring], ghost isInit bool) {
 	r in s &&
 	(forall i *Ring :: i in s ==> (acc(&i.next) && acc(&i.prev) && acc(&i.Value))) &&
 	((r.next == nil || r.prev == nil) ==> !isInit) && //# More correctly, it is !isInit if it cannot reach itself in both directions via the same Ring elements
 	(!isInit ==> ((s == set[*Ring]{r}) && (r.next == nil && r.prev == nil))) &&
 	(isInit ==> (
-		(len(s)==1 ==> (r.next==r && r.prev==r)) &&
+		(len(s) == 1 ==> (r.next==r && r.prev==r)) &&
 		(forall i *Ring :: i in s ==> (i.next != nil && i.prev != nil)) &&
-		//((len(s) > 1) ==> (forall i *Ring :: i in s ==> (i.next != i && i.prev != i))) &&
+		((len(s) > 1) ==> (forall i *Ring :: i in s ==> (i.next != i && i.prev != i))) &&
 		(forall i, j *Ring :: ((i in s && i.next == j) ==> (j in s && j.prev == i && i.next.prev == i && j.prev.next == j))) &&
 		(forall i, j *Ring :: ((i in s && i.prev == j) ==> (j in s && j.next == i && i.prev.next == i && j.next.prev == j)))))
 }
 //# enforce structure by:
 //# forall elements, forall i in [0,len]: moveLeft(i) == moveRight(len-i)
 //# problematic for Ring because we get Len() by the same logic
-/*
+
 requires r.Mem(elems, isInit)
 ensures  r.Mem(set[*Ring]{r}, true)
 ensures  r == res
@@ -49,17 +50,17 @@ func (r *Ring) init(ghost elems set[*Ring], ghost isInit bool) (res *Ring) {
 
 // Next returns the next ring element. r must not be empty.
 //# We use 'owner' here to make calls from different receivers in the same ring structure work (see e.g. Link)
-requires r != nil
+//requires r != nil
 requires r in elems
 requires owner.Mem(elems, isInit)
 ensures  !isInit ==> (owner.Mem(set[*Ring]{r}, true) && res == r) //# The comment does not explain that r is returned if the ring is not initialized but that's what the implementation does.
 ensures  isInit ==> (owner.Mem(elems, true) && res in elems)
-ensures  isInit ==> (unfolding owner.Mem(elems, true) in (res == r.next))
+ensures  isInit ==> res == r.NextPure(elems, owner)
 decreases
 func (r *Ring) Next(ghost elems set[*Ring], ghost owner *Ring, ghost isInit bool) (res *Ring) {
 	unfold owner.Mem(elems, isInit)
 	if r.next == nil {
-		//# here we know !isInit
+		assert !isInit //# here we know !isInit
 		fold owner.Mem(elems, false)
 		return r.init(elems, false)
 	}
@@ -67,6 +68,16 @@ func (r *Ring) Next(ghost elems set[*Ring], ghost owner *Ring, ghost isInit bool
 	fold owner.Mem(elems, true)
 }
 
+ghost
+requires r in elems
+requires owner.Mem(elems, true)
+ensures  unfolding owner.Mem(elems, true) in res == r.next
+ensures  unfolding owner.Mem(elems, true) in len(elems) > 1 ==> res != r //# This implication is already guaranteed by the predicate but this fact is needed explicitly in 'Link'
+decreases
+pure
+func (r *Ring) NextPure(ghost elems set[*Ring], ghost owner *Ring) (res *Ring) {
+	return unfolding owner.Mem(elems, true) in r.next
+}
 
 // Prev returns the previous ring element. r must not be empty.
 //# We use 'owner' here to make calls from different receivers in the same ring structure work (see e.g. Link)
@@ -75,12 +86,12 @@ requires r in elems
 requires owner.Mem(elems, isInit)
 ensures  !isInit ==> (owner.Mem(set[*Ring]{r}, true) && res == r) //# The comment does not explain that r is returned if the ring is not initialized but that's what the implementation does.
 ensures  isInit ==> (owner.Mem(elems, true) && res in elems)
-ensures  isInit ==> (unfolding owner.Mem(elems, true) in (res == r.prev))
+ensures  isInit ==> res == r.PrevPure(elems, owner)
 decreases
 func (r *Ring) Prev(ghost elems set[*Ring], ghost owner *Ring, ghost isInit bool) (res *Ring) {
 	unfold owner.Mem(elems, isInit)
 	if r.next == nil {
-		//# here we know !isInit
+		assert !isInit //# here we know !isInit
 		fold owner.Mem(elems, false)
 		return r.init(elems, false)
 	}
@@ -88,16 +99,28 @@ func (r *Ring) Prev(ghost elems set[*Ring], ghost owner *Ring, ghost isInit bool
 	fold owner.Mem(elems, true)
 }
 
+ghost
+requires r in elems
+requires owner.Mem(elems, true)
+ensures  unfolding owner.Mem(elems, true) in res == r.prev
+ensures  unfolding owner.Mem(elems, true) in len(elems) > 1 ==> res != r //# This implication is already guaranteed by the predicate but this fact is needed explicitly in 'Link'
+decreases
+pure
+func (r *Ring) PrevPure(ghost elems set[*Ring], ghost owner *Ring) (res *Ring) {
+	return unfolding owner.Mem(elems, true) in r.prev
+}
+
 
 ghost
 requires owner.Mem(elems,true)
 requires r in elems
 requires n >= 0
-ensures (n==0) ==> res==r 
-ensures (n>0) ==> res==(unfolding owner.Mem(elems,true) in r.next.moveNext(n-1, owner, elems)) 
+ensures  n == 0 ==> res == r 
+ensures  n > 0 ==> res == (unfolding owner.Mem(elems,true) in r.next.moveNext(n - 1, owner, elems)) 
+decreases n
 pure func (r *Ring) moveNext(n int, ghost owner *Ring, ghost elems set[*Ring]) (res * Ring){
-	return unfolding owner.Mem(elems,true) in ((n==0) ? r : r.next.moveNext(n-1, owner, elems))
-}*/
+	return unfolding owner.Mem(elems, true) in ((n == 0) ? r : r.next.moveNext(n - 1, owner, elems))
+}
 
 /*
 //# TEST NEXT
@@ -111,16 +134,17 @@ func (r *Ring) moveNextTest(ghost elems set[*Ring]) (res *Ring){
 	fold r.Mem(elems, true)
 }
 */
-/*------
+
 ghost
 requires owner.Mem(elems,true)
 requires r in elems
 requires n <= 0
-ensures (n==0) ==> res==r 
-ensures (n<0) ==> res==(unfolding owner.Mem(elems,true) in r.prev.movePrev(n+1, owner, elems)) 
+ensures  n == 0 ==> res == r 
+ensures  n < 0 ==> res == (unfolding owner.Mem(elems,true) in r.prev.movePrev(n + 1, owner, elems)) 
+decreases 0 - n
 pure func (r *Ring) movePrev(n int, ghost owner *Ring, ghost elems set[*Ring]) (res * Ring){
-	return unfolding owner.Mem(elems,true) in ((n==0) ? r : r.prev.movePrev(n+1, owner, elems))
-}*/
+	return unfolding owner.Mem(elems, true) in ((n == 0) ? r : r.prev.movePrev(n + 1, owner, elems))
+}
 
 /*
 //# TEST PREV
@@ -136,17 +160,17 @@ func (r *Ring) movePrevTest(ghost elems set[*Ring]) (res *Ring){
 */
 
 
-/*
+
 // Move moves n % r.Len() elements backward (n < 0) or forward (n >= 0)
 // in the ring and returns that ring element. r must not be empty.
 requires  r.Mem(elems, isInit) //# make this PRESERVES
 requires  r != nil
 requires  r in elems
 ensures   !isInit ==> (r.Mem(set[*Ring]{r}, true) && res == old(r)) //# The comment does not explain that r is returned if the ring is not initialized but that's what the implementation does.
-ensures   (n == 0) ==> (res == r)
+ensures   n == 0 ==> res == r
 ensures   isInit ==> r.Mem(elems, true)
-//ensures   (isInit && n>0) ==> (res == r.moveNext(n, r, elems))
-//ensures   (isInit && n<0) ==> (res == r.movePrev(n, r, elems))
+//ensures   (isInit && n > 0) ==> (res == r.moveNext(n, r, elems))
+//ensures   (isInit && n < 0) ==> (res == r.movePrev(n, r, elems))
 //# Why does the implementation not make the modulo calculation and save on potentially unnecessary iterations? --> We'd need to run Len() (Len() many iterations) but for n > 2*Len() it'd still always make sense to compute the modulus
 func (r *Ring) Move(n int, ghost elems set[*Ring], ghost isInit bool) (res *Ring) {
 	if unfolding r.Mem(elems, isInit) in r.next == nil {
@@ -181,7 +205,9 @@ func (r *Ring) Move(n int, ghost elems set[*Ring], ghost isInit bool) (res *Ring
 		}
 	}
 	return r
-}*/
+}
+
+
 
 // New creates a ring of n elements.
 ensures n <= 0 ==> res == nil
@@ -194,52 +220,38 @@ func New(n int) (res *Ring, ghost elems set[*Ring]) {
 	}
 	r := new(Ring)
 	p := r
-
-	var q *Ring = p //testing
-
+	ghost q := r //ghost dummy
 	elems = set[*Ring]{r}
 
-	invariant (1 <= i && i <= n)
+	invariant 1 <= i && i <= n
 	invariant r in elems
 	invariant p in elems
-	invariant q in elems
-	invariant (forall e *Ring :: e in elems ==> (acc(&e.next) && acc(&e.prev) && acc(&e.Value)))
-	
-	invariant r != p ==> (q != p && q.next != nil && q.next == p && p.prev == q)
+	invariant len(elems) == i
+	invariant q in elems //ghost dummy
+	invariant forall e *Ring :: e in elems ==> (acc(&e.next) && acc(&e.prev) && acc(&e.Value))
+
+	invariant r != p ==> (q.next != nil && q.next == p) //ghost dummy
 
 	invariant r != p ==> p.prev != nil
 	invariant forall e *Ring :: e in elems ==> ((e != r && e != p) ==> (e.next != nil && e.prev != nil))
-	invariant forall e, s *Ring :: (e in elems && e.next == s && e != p && s != r) ==> (s in elems && s.prev == e && e.next.prev == e && s.prev.next == s)
-	//invariant forall e, s *Ring :: (e in elems && e.prev == s && e != r && s != p) ==> (s in elems && s.next == e /*&& e.prev.next == e && s.next.prev == s*/)
-	//invariant forall e, s *Ring :: (e in elems && e.prev == s && e != r && s != p) ==> (s in elems && s.next == e) //# Why does this not work?
+	invariant forall e1, e2 *Ring :: (e1 in elems && e1.next == e2 && e1 != p && e2 != r) ==> (e2 in elems && e2.prev == e1 && e1.next.prev == e1 && e2.prev.next == e2)
+	//invariant forall e1, e2 *Ring :: (e1 in elems && e1.prev == e2 && e1 != r && e2 != p) ==> (e2 in elems && e2.next == e1 && e1.prev.next == e1 && e2.next.prev == e2)
+	//invariant forall e1, e2 *Ring :: (e1 in elems && e1.prev == e2 && e1 != r && e2 != p) ==> (e2 in elems && e2.next == e1) //# Why does this not work?
 	decreases n-i
 	for i := 1; i < n; i++ {
 		p.next = &Ring{prev: p}
-		
-		q = p //testing
+		q = p //ghost dummy
 		p = p.next
+		assert !(p in elems)
 		elems = elems union set[*Ring]{p}
+		assert p.prev == q
+		assert q.next == p
 	}
 
-	//unfold r.Mem(elems, false)
+
 	p.next = r
 	r.prev = p
-	//assert forall e, s *Ring :: (e in elems && e.next == s && e != p && s != r) ==> (s in elems && s.prev == e && e.next.prev == e && s.prev.next == s)
-	assert p in elems
-	assert r in elems
-	assert p.next == r
-	assert r.prev == p
-	assert r.prev.next == r
-	assert p.next.prev == p
-	//assert forall e, s *Ring :: (e in elems && e.next == s && e == p && s == r) ==> (s in elems && s.prev == e && e.next.prev == e && s.prev.next == s)
-	//assert forall e, s *Ring :: (e in elems && e.next == s && e == p && s != r) ==> (s in elems && s.prev == e && e.next.prev == e && s.prev.next == s)
-	//assert forall e, s *Ring :: (e in elems && e.next == s && s == r) ==> (s in elems && s.prev == e && e.next.prev == e && s.prev.next == s)
-	//assert forall e, s *Ring :: (e in elems && e.next == s && s != r) ==> (s in elems && s.prev == e && e.next.prev == e && s.prev.next == s)
-	//assert forall e, s *Ring :: (e in elems && e.next == s && e == p) ==> (s in elems && s.prev == e && e.next.prev == e && s.prev.next == s)
-	//assert forall e, s *Ring :: (e in elems && e.next == s) ==> (s in elems && s.prev == e && e.next.prev == e && s.prev.next == s)
-
 	
-	assert forall e *Ring :: e in elems ==> (e.next != nil && e.prev != nil)
 
 	res = r
 }
@@ -291,8 +303,14 @@ func New(n int) (res *Ring, ghost elems set[*Ring]) {
 	res = r
 }*/
 
+requires r.Mem(elems, true)
+requires r in elems //# contained within the predicate but required for the precondition of Next
+func (r *Ring) problem(ghost elems set[*Ring]) (res *Ring) {
+	n := r.Next(elems, r, true)
+	assert n == r.NextPure(elems, r)
+	//assert n == old(r.NextPure(elems, r))
+}
 
-/*
 // Link connects ring r with ring s such that r.Next()
 // becomes s and returns the original value for r.Next().
 // r must not be empty.
@@ -303,20 +321,21 @@ func New(n int) (res *Ring, ghost elems set[*Ring]) {
 // reference to that subring (if no elements were removed,
 // the result is still the original value for r.Next(),
 // and not nil).
-//#"Pointing to the same ring" here means to elements of the same ring structure
+//# "Pointing to the same ring" here means to elements of the same ring structure
 //
 // If r and s point to different rings, linking
 // them creates a single ring with the elements of s inserted
 // after r. The result points to the element following the
 // last element of s after insertion.
-//#This means likewise the result points to the original r.Next()
+//# This means likewise the result points to the original r.Next()
 requires r != nil
 requires r in elemsR
 requires r.Mem(elemsR, true)
 requires (s != nil && !(s in elemsR)) ==> (s.Mem(elemsS, true) && s in elemsS)
-//ensures  (!(s in elemsR)) ==> (res == old(unfolding r.Mem(elemsR, true) in r.next && res.Mem((elemsR union elemsS), true)))
+//ensures  (!(s in elemsR)) ==> (res == old(unfolding r.Mem(elemsR, true) in r.next) /*&& res.Mem((elemsR union elemsS), true)*/)
 func (r *Ring) Link(s *Ring, ghost elemsR set[*Ring], ghost elemsS set[*Ring]) (res *Ring) {
 	n := r.Next(elemsR, r, true)
+	assert n == r.NextPure(elemsR, r)
 	if s != nil {
 		ghost elemsX := (s in elemsR)?(elemsR):(elemsS)
 		ghost owner := (s in elemsR)?(r):(s)
@@ -327,6 +346,9 @@ func (r *Ring) Link(s *Ring, ghost elemsR set[*Ring], ghost elemsS set[*Ring]) (
 		ghost if !(s in elemsR){
 			unfold s.Mem(elemsS, true)
 		}
+
+		assert r.next == n
+
 		r.next = s
 		s.prev = r
 		n.prev = p //# This only works due to the postcondition 'res in elems' in Next()
@@ -334,16 +356,34 @@ func (r *Ring) Link(s *Ring, ghost elemsR set[*Ring], ghost elemsS set[*Ring]) (
 		ghost if !(s in elemsR){
 			fold n.Mem((elemsR union elemsS), true)
 		}
-		//ghost if (s in elemsR){
-		//	ghost if r==s && len(elemsR)>1{
-		//		fold n.Mem((elemsR setminus (set[*Ring]{r})), true)
-		//	}
-		//	//fold n.Mem((?????), true) //# elems needs to be all elements strictly between r and s, BUT WHAT IF r==s??
-		//}
+		ghost if (s in elemsR){
+			ghost if r == s {
+				ghost if len(elemsR) == 1 {
+					assert r == n
+					assert r == p
+					assert r.next == r && r.prev == r
+					//fold n.Mem(elemsR, true)
+				}
+				ghost if len(elemsR) > 1 {
+					assert n != r
+					assert p != r
+					assert forall i *Ring :: i in (elemsR setminus (set[*Ring]{r})) ==> (i.next != nil && i.prev != nil)
+					assert n.prev == p
+					assert p.next == n
+					assert forall i, j *Ring :: (i in (elemsR setminus (set[*Ring]{r})) && i.next == j) ==> (j in (elemsR setminus (set[*Ring]{r})) && j.prev == i) //# Already this does not work
+					//assert forall i, j *Ring :: (i in (elemsR setminus (set[*Ring]{r})) && i.next == j) ==> (j in (elemsR setminus (set[*Ring]{r})) && j.prev == i && i.next.prev == i && j.prev.next == j)
+					//assert forall i, j *Ring :: (i in (elemsR setminus (set[*Ring]{r})) && i.prev == j) ==> (j in (elemsR setminus (set[*Ring]{r})) && j.next == i && i.prev.next == i && j.next.prev == j)
+					//fold n.Mem((elemsR setminus (set[*Ring]{r})), true)
+				}
+				
+			}
+			//fold n.Mem((?????), true) //# elems needs to be all elements strictly between r and s, BUT WHAT IF r==s??
+		}
 	}
+	//assert n == old(r.NextPure(elemsR, r)) //# Why does this not work?
 	return n
 }
-*/
+
 
 /*
 // Unlink removes n % r.Len() elements from the ring r, starting
@@ -354,21 +394,34 @@ func (r *Ring) Unlink(n int) *Ring {
 		return nil
 	}
 	return r.Link(r.Move(n + 1))
-}
+}*/
 
 // Len computes the number of elements in ring r.
 // It executes in time proportional to the number of elements.
-func (r *Ring) Len() int {
+//# This method can be called on a ring r that is not yet properly initialize.
+//# In that case the loop initialization will call r.Next(), return an initialized ring r and terminate while returning a length of 1.
+requires r != nil ==> r.Mem(elems, isInit)
+ensures  r == nil ==> res == 0
+func (r *Ring) Len(ghost elems set[*Ring], ghost isInit bool) (res int) {
 	n := 0
 	if r != nil {
 		n = 1
-		for p := r.Next(); p != r; p = p.next {
+		ghost getsInit := false
+
+		invariant n >= 1
+		invariant isInit ==> r.Mem(elems, true) //# How do we talk about the predicate when !isInit? An invariant talks about what is true before and after every loop iteration but the predicate changes in the loop initialization.
+		invariant !isInit ==> r.Mem(elems, getsInit) //# This attempt does not work because the loop initialization happens before the check for the invariant.
+		invariant r in elems
+		invariant !isInit ==> p == r
+		decreases len(elems) - n
+		for p, getsInit := r.Next(elems, r, isInit), true; p != r; p = p.next {
 			n++
 		}
 	}
 	return n
 }
 
+/*
 // Do calls function f on each element of the ring, in forward order.
 // The behavior of Do is undefined if f changes *r.
 func (r *Ring) Do(f func(any)) {
