@@ -246,9 +246,8 @@ func (l *List) move(e, at *Element /*@, ghost elems set[*Element] @*/) {
 //@ requires e != nil
 //@ requires l.Mem(elems, true)
 //@ requires e != &l.root
-//# The next three lines aim to establish: (e.list == l) IFF (e in elems)
+//# The next two lines aim to establish: (e.list == l) IFF (e in elems)
 //@ requires !(e in elems) ==> (acc(e) && e.list != l)
-//@ requires e in elems	==> (unfolding l.Mem(elems, true) in e.list == l)
 //@ requires unfolding l.Mem(elems, true) in ((e.list == l ==> e in elems) && ((e.list != l) ==> !(e in elems)))
 //@ ensures  !(e in elems) ==> l.Mem(elems, true)
 //@ ensures  e in elems ==> l.Mem((elems setminus (set[*Element]{e})), true)
@@ -301,10 +300,10 @@ func (l *List) PushBack(v any /*@, ghost elems set[*Element], ghost isInit bool 
 // If mark is not an element of l, the list is not modified.
 // The mark must not be nil.
 //@ requires mark != nil
+//@ requires mark != &l.root
 //@ requires l.Mem(elems, true) //# Same as 'Remove', we only accept initialized lists and disallow the crash.
-//# The next three lines aim to establish: (mark.list == l) IFF (mark in elems)
+//# The next two lines aim to establish: (mark.list == l) IFF (mark in elems)
 //@ requires !(mark in elems) ==> (acc(mark) && mark.list != l)
-//@ requires (mark in elems) ==> (unfolding l.Mem(elems, true) in mark.list == l)
 //@ requires unfolding l.Mem(elems, true) in ((mark.list == l ==> mark in elems) && ((mark.list != l) ==> !(mark in elems)))
 
 //@ ensures  (mark in elems) ==> l.Mem(elems union set[*Element]{res}, true)
@@ -327,10 +326,10 @@ func (l *List) InsertBefore(v any, mark *Element /*@, ghost elems set[*Element] 
 // If mark is not an element of l, the list is not modified.
 // The mark must not be nil.
 //@ requires mark != nil
+//@ requires mark != &l.root
 //@ requires l.Mem(elems, true) //# Same as 'Remove', we only accept initialized lists and disallow the crash.
-//# The next three lines aim to establish: (mark.list == l) IFF (mark in elems)
+//# The next two lines aim to establish: (mark.list == l) IFF (mark in elems)
 //@ requires !(mark in elems) ==> (acc(mark) && mark.list != l)
-//@ requires (mark in elems) ==> (unfolding l.Mem(elems, true) in mark.list == l)
 //@ requires unfolding l.Mem(elems, true) in ((mark.list == l ==> mark in elems) && ((mark.list != l) ==> !(mark in elems)))
 
 //@ ensures  (mark in elems) ==> l.Mem(elems union set[*Element]{res}, true)
@@ -352,11 +351,10 @@ func (l *List) InsertAfter(v any, mark *Element /*@, ghost elems set[*Element] @
 // If e is not an element of l, the list is not modified.
 // The element must not be nil.
 //@ requires e != nil
-//@ requires e != &l.root //# A user of the package should not be able to obtain the pointer to the root. We need this here for the implication in the post-condition of 'move'.
+//@ requires e != &l.root
 //@ requires l.Mem(elems, true) //# Same as 'Remove', we only accept initialized lists and disallow the crash.
-//# The next three lines aim to establish: (e.list == l) IFF (e in elems)
+//# The next two lines aim to establish: (e.list == l) IFF (e in elems)
 //@ requires !(e in elems) ==> (acc(e) && e.list != l)
-//@ requires (e in elems) ==> (unfolding l.Mem(elems, true) in e.list == l)
 //@ requires unfolding l.Mem(elems, true) in ((e.list == l ==> e in elems) && ((e.list != l) ==> !(e in elems)))
 //@ ensures  l.Mem(elems, true)
 //@ ensures  (e in elems) ==> (unfolding l.Mem(elems, true) in (l.root.next == e && e.prev == &l.root))
@@ -376,10 +374,10 @@ func (l *List) MoveToFront(e *Element /*@, ghost elems set[*Element] @*/) {
 // If e is not an element of l, the list is not modified.
 // The element must not be nil.
 //@ requires e != nil
+//@ requires e != &l.root
 //@ requires l.Mem(elems, true) //# Same as 'Remove', we only accept initialized lists and disallow the crash.
-//# The next three lines aim to establish: (e.list == l) IFF (e in elems)
+//# The next two lines aim to establish: (e.list == l) IFF (e in elems)
 //@ requires !(e in elems) ==> (acc(e) && e.list != l)
-//@ requires (e in elems) ==> (unfolding l.Mem(elems, true) in e.list == l)
 //@ requires unfolding l.Mem(elems, true) in ((e.list == l ==> e in elems) && ((e.list != l) ==> !(e in elems)))
 //@ ensures  l.Mem(elems, true)
 //# We still need to reason about e's position after the move.
@@ -400,15 +398,15 @@ func (l *List) MoveToBack(e *Element /*@, ghost elems set[*Element] @*/) {
 // If e or mark is not an element of l, or e == mark, the list is not modified.
 // The element and mark must not be nil.
 //@ requires e != nil
+//@ requires e != &l.root
 //@ requires mark != nil
+//@ requires mark != &l.root
 //@ requires l.Mem(elems, true)
 //# (e.list == l) IFF (e in elems)
 //@ requires !(e in elems) ==> (acc(e) && e.list != l)
-//@ requires (e in elems) ==> (unfolding l.Mem(elems, true) in e.list == l)
 //@ requires unfolding l.Mem(elems, true) in ((e.list == l ==> e in elems) && ((e.list != l) ==> !(e in elems)))
 //# (mark.list == l) IFF (mark in elems)
 //@ requires !(mark in elems) ==> (acc(mark) && mark.list != l)
-//@ requires (mark in elems) ==> (unfolding l.Mem(elems, true) in mark.list == l)
 //@ requires unfolding l.Mem(elems, true) in ((mark.list == l ==> mark in elems) && ((mark.list != l) ==> !(mark in elems)))
 //@ ensures  l.Mem(elems, true)
 //# We still need to reason about e's position after the move.
@@ -428,15 +426,15 @@ func (l *List) MoveBefore(e, mark *Element /*@, ghost elems set[*Element] @*/) {
 // If e or mark is not an element of l, or e == mark, the list is not modified.
 // The element and mark must not be nil.
 //@ requires e != nil
+//@ requires e != &l.root
 //@ requires mark != nil
+//@ requires mark != &l.root
 //@ requires l.Mem(elems, true)
 //# (e.list == l) IFF (e in elems)
 //@ requires !(e in elems) ==> (acc(e) && e.list != l)
-//@ requires (e in elems) ==> (unfolding l.Mem(elems, true) in e.list == l)
 //@ requires unfolding l.Mem(elems, true) in ((e.list == l ==> e in elems) && ((e.list != l) ==> !(e in elems)))
 //# (mark.list == l) IFF (mark in elems)
 //@ requires !(mark in elems) ==> (acc(mark) && mark.list != l)
-//@ requires (mark in elems) ==> (unfolding l.Mem(elems, true) in mark.list == l)
 //@ requires unfolding l.Mem(elems, true) in ((mark.list == l ==> mark in elems) && ((mark.list != l) ==> !(mark in elems)))
 //@ ensures  l.Mem(elems, true)
 //@ ensures  (mark != e && e in elems && mark in elems) ==> (unfolding l.Mem(elems, true) in (mark.next == e && e.prev == mark))
