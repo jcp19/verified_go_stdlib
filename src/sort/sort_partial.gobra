@@ -184,38 +184,44 @@ func (x IntSlice) Swap(i, j int, ghost elems seq[any]) (ghost swapped_elems seq[
 requires data.Mem(elems)
 requires data != nil
 requires 0 <= a && a < len(elems)
-requires a+1 < b && b <= len(elems) //# the element at position b does not get sorted
+requires a <= b && b <= len(elems) //# the element at position b does not get sorted
 ensures  data.Mem(sorted_elems)
+ensures  len(sorted_elems) == len(elems)
+ensures  a == b ==> isPartiallySorted(data, a, a, sorted_elems)
 //ensures  isPartiallySorted(data, a, b-1, sorted_elems)
 func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted_elems seq[any]) {
 	sorted_elems = elems
+	assert len(sorted_elems) == len(elems)
 	assert data.Mem(sorted_elems)
 
-	invariant a < i && i <= b
+	invariant len(sorted_elems) == len(elems)
+	invariant a < i
 	invariant b <= len(sorted_elems)
-	invariant (a < b) ==> (i <= b)
+	invariant a < b ==> i <= b
 	invariant data.Mem(sorted_elems)
 	//invariant isPartiallySorted(data, a, i-1, sorted_elems)
 	decreases b-i
 	for i := a + 1; i < b; i++ { //# for any kind of sorting to happen b has to be at least a+2, does this mean if called with b=a+1 that this will not be sorted? Answer: YES, should we enforce that in the precondition?
+		invariant len(sorted_elems) == len(elems)
 		invariant i < b
 		invariant b <= len(sorted_elems)
 		invariant a <= j && j <= i
-		invariant (a < j) ==> (0 <= j-1)
+		invariant a < j ==> 0 <= j-1
 		invariant data.Mem(sorted_elems)
 		//invariant isPartiallySorted(data, a, XXX, sorted_elems)
 		//invariant isPartiallySorted(data, YYY, i, sorted_elems)
 		decreases j-a
-		for j := i; j > a /*&& data.Less(j, j-1, elems)*/; j-- { //# Here it complains it could be j-1<0. But we know 0<a and a<=j and from the conjunction in this line we even know a<j. Problem with inline inference? 
+		for j := i; j > a /*&& data.Less(j, j-1, elems)*/; j-- {
 			assert 0 <= j-1
 			assert i < b
 			assert i < len(sorted_elems)
-			if data.Less(j, j-1, sorted_elems) {
+			if data.Less(j, j-1, sorted_elems) { //# The second conjunct in the loop condition was commented out and introduced here as an IF block. This is due to a bug in Gobra where short circuiting is not detected. See https://github.com/viperproject/gobra/issues/511
 				sorted_elems = data.Swap(j, j-1, sorted_elems)
 			} else {
 				break
 			}
 		}
 	}
+	
 }
 // ######### END FROM zsortinterface ##############
