@@ -60,6 +60,7 @@ type Interface interface {
 	ensures  elems[i] === swapped_elems[j]
 	ensures  elems[j] === swapped_elems[i]
 	ensures  forall x int :: (0 <= x && x < len(elems) && x != i && x != j) ==> (elems[x] === swapped_elems[x])
+	ensures  old(less_spec(i, j, elems)) ==> !less_spec(i, j, swapped_elems) //# We make the effect of the Swap operation on the Less relation explicit.
 	Swap(i, j int, ghost elems seq[any]) (ghost swapped_elems seq[any])
 }
 
@@ -71,36 +72,40 @@ requires data != nil
 requires data.Mem(elems)
 requires 0 <= start && start < len(elems)
 requires start <= end && end < len(elems)
-ensures  (end - start <= 1) ==> res
-ensures  (end - start > 1 && !data.less_spec(end, end-1, elems)) ==> (res == isPartiallySorted(data, start, end-1, elems))
-ensures  (end - start > 1 &&  data.less_spec(end, end-1, elems)) ==> !res
-//ensures  res ==> (forall idx int :: ((start < idx && idx < end+1) ==> (!data.less_spec(idx, idx-1, elems)))) //# Would like to be able to infer that
+ensures  end - start == 0 ==> res == true
+ensures  (end - start > 0 && !data.less_spec(end, end - 1, elems)) ==> res == isPartiallySorted(data, start, end - 1, elems)
+ensures  (end - start > 0 &&  data.less_spec(end, end - 1, elems)) ==> !res
+//ensures  res ==> (forall idx int :: ((start < idx && idx <= end) ==> !data.less_spec(idx, idx - 1, elems))) //# Would like to be able to infer that
+//ensures (res && start+2 < end) ==> !data.less_spec(end, end - 1, elems) && !data.less_spec(end-1, end - 2, elems) && !data.less_spec(end-2, end-3, elems)
 pure
 func isPartiallySorted(data Interface, start, end int, ghost elems seq[any]) (res bool) {
-	return (end - start <= 1) ? true : (!data.less_spec(end, end-1, elems) ? isPartiallySorted(data, start, end-1, elems) : false)
+	return (end - start == 0) ? true : (!data.less_spec(end, end - 1, elems) ? isPartiallySorted(data, start, end - 1, elems) : false)
 }
 
 // IsSorted reports whether data is sorted.
 preserves data.Mem(elems)
 requires  data != nil
-ensures   res ==> (forall idx int :: ((0 < idx && idx < len(elems)) ==> (!data.less_spec(idx, idx-1, elems))))
+ensures   res ==> forall idx int :: ((0 < idx && idx < len(elems)) ==> (!data.less_spec(idx, idx - 1, elems)))
+ensures   !res ==> !(forall idx int :: ((0 < idx && idx < len(elems)) ==> (!data.less_spec(idx, idx - 1, elems))))
 func IsSorted(data Interface, ghost elems seq[any]) (res bool) {
 	n := data.Len(elems)
 
 	res = true //# moved this up for use in the invariant
 
+	invariant res
 	invariant i < n
-	invariant (len(elems) > 0) ==> (0 <= i) //# if n==0 then i==-1 after initialization
+	invariant len(elems) > 0 ==> 0 <= i //# if n==0 then i==-1 after initialization
 	invariant data.Mem(elems)
-	invariant (res && len(elems) != 0) ==> (forall idx int :: ((i < idx && idx < len(elems)) ==> (!data.less_spec(idx, idx-1, elems))))
-	//invariant (res && len(elems) != 0) ==> isPartiallySorted(data, i, n-1, elems) //# Would like for this to hold here
+	invariant len(elems) != 0 ==> (forall idx int :: ((i < idx && idx < len(elems)) ==> !data.less_spec(idx, idx - 1, elems)))
+	//invariant len(elems) != 0 ==> isPartiallySorted(data, i, n - 1, elems) //# Would like for this to hold here
 	decreases i
 	for i := n - 1; i > 0; i-- {
-		if data.Less(i, i-1, elems) {
-			res = false
-			return
+		if data.Less(i, i - 1, elems) {
+			return false
 		}
+		//assert isPartiallySorted(data, i, n - 1, elems)
 	}
+	assert res
 	return
 }
 
@@ -111,12 +116,12 @@ type IntSlice []int
 
 //# Adapted from Gobra tutorial
 ghost
-requires forall j int :: 0 <= j && j < len(s) ==> acc(&s[j],_)
+requires forall j int :: 0 <= j && j < len(s) ==> acc(&s[j], _)
 ensures len(res) == len(s)
 ensures forall j int :: {s[j]} {res[j]} 0 <= j && j < len(s) ==> s[j] == res[j]
 pure func toSeq(s []int) (res seq[any]) {
   return (len(s) == 0 ? seq[any]{} :
-      toSeq(s[:len(s)-1]) ++ seq[any]{s[len(s) - 1]})
+      toSeq(s[:len(s) - 1]) ++ seq[any]{s[len(s) - 1]})
 }
 
 pred (x IntSlice) Mem(ghost s seq[any]){
@@ -159,14 +164,15 @@ ensures  x.Mem(swapped_elems)
 ensures  len(elems) == len(swapped_elems) //# somehow this does not suffice to infer i and j are in range [0, len(swapped_elems)-1]
 ensures  0 <= i && i < len(elems) && i < len(swapped_elems) //# possibly make Len() pure and use that
 ensures  0 <= j && j < len(elems) && j < len(swapped_elems) //# possibly make Len() pure and use that
-//# These 3 lines are required..
-ensures  old(unfolding x.Mem(elems) in x[i]) === (unfolding x.Mem(swapped_elems) in x[j])
-ensures  old(unfolding x.Mem(elems) in x[j]) === (unfolding x.Mem(swapped_elems) in x[i])
-ensures  forall idx int :: (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (old(unfolding x.Mem(elems) in x[idx]) === (unfolding x.Mem(swapped_elems) in x[idx]))
-//# ..for these 3 corresponding lines to work. Why?
+//# This line is required..
+//ensures  old(unfolding x.Mem(elems) in x[i]) == (unfolding x.Mem(swapped_elems) in x[j])
+//ensures  old(unfolding x.Mem(elems) in x[j]) == (unfolding x.Mem(swapped_elems) in x[i])
+ensures  forall idx int :: (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (old(unfolding x.Mem(elems) in x[idx]) == (unfolding x.Mem(swapped_elems) in x[idx]))
+//# ..for these 3 corresponding lines to work.
 ensures  elems[i] === swapped_elems[j]
 ensures  elems[j] === swapped_elems[i]
 ensures  forall idx int :: (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (elems[idx] === swapped_elems[idx])
+ensures  old(x.less_spec(i, j, elems)) ==> !x.less_spec(i, j, swapped_elems)
 func (x IntSlice) Swap(i, j int, ghost elems seq[any]) (ghost swapped_elems seq[any]) {
 	unfold x.Mem(elems)
 	x[i], x[j] = x[j], x[i]
@@ -188,35 +194,37 @@ requires a <= b && b <= len(elems) //# the element at position b does not get so
 ensures  data.Mem(sorted_elems)
 ensures  len(sorted_elems) == len(elems)
 ensures  a == b ==> isPartiallySorted(data, a, a, sorted_elems)
-//ensures  isPartiallySorted(data, a, b-1, sorted_elems)
+//ensures  isPartiallySorted(data, a, b - 1, sorted_elems)
 func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted_elems seq[any]) {
 	sorted_elems = elems
-	assert len(sorted_elems) == len(elems)
 	assert data.Mem(sorted_elems)
 
 	invariant len(sorted_elems) == len(elems)
 	invariant a < i
-	invariant b <= len(sorted_elems)
 	invariant a < b ==> i <= b
 	invariant data.Mem(sorted_elems)
-	//invariant isPartiallySorted(data, a, i-1, sorted_elems)
+	//# invariant prefix [a:i] is always sorted
+	//invariant forall idx int :: (a < idx && idx < i && i < b) ==> !data.less_spec(idx, idx - 1, sorted_elems) 
+	//invariant isPartiallySorted(data, a, i - 1, sorted_elems)
 	decreases b-i
 	for i := a + 1; i < b; i++ { //# for any kind of sorting to happen b has to be at least a+2, does this mean if called with b=a+1 that this will not be sorted? Answer: YES, should we enforce that in the precondition?
 		invariant len(sorted_elems) == len(elems)
 		invariant i < b
-		invariant b <= len(sorted_elems)
 		invariant a <= j && j <= i
-		invariant a < j ==> 0 <= j-1
+		invariant a < j ==> 0 <= j - 1
 		invariant data.Mem(sorted_elems)
+		//# invariant prefix [a:j-2] is always sorted and [j:i] is always sorted
+		//invariant forall idx int :: (j < idx && idx < i) ==> !data.less_spec(idx, idx - 1, sorted_elems) 
 		//invariant isPartiallySorted(data, a, XXX, sorted_elems)
 		//invariant isPartiallySorted(data, YYY, i, sorted_elems)
 		decreases j-a
-		for j := i; j > a /*&& data.Less(j, j-1, elems)*/; j-- {
-			assert 0 <= j-1
+		for j := i; j > a /*&& data.Less(j, j - 1, elems)*/; j-- {
+			assert 0 <= j - 1
 			assert i < b
 			assert i < len(sorted_elems)
-			if data.Less(j, j-1, sorted_elems) { //# The second conjunct in the loop condition was commented out and introduced here as an IF block. This is due to a bug in Gobra where short circuiting is not detected. See https://github.com/viperproject/gobra/issues/511
-				sorted_elems = data.Swap(j, j-1, sorted_elems)
+			if data.Less(j, j - 1, sorted_elems) { //# The second conjunct in the loop condition was commented out and introduced here as an IF block. This is due to a bug in Gobra where short circuiting is not detected. See https://github.com/viperproject/gobra/issues/511
+				sorted_elems = data.Swap(j, j - 1, sorted_elems)
+				assert !data.less_spec(j, j - 1, sorted_elems)
 			} else {
 				break
 			}
@@ -225,3 +233,27 @@ func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted
 	
 }
 // ######### END FROM zsortinterface ##############
+
+
+//# helper
+
+ghost
+ensures forall e any :: e in elemsSeq ==> e in elemsSet
+pure func toSet(ghost elemsSeq seq[any]) (ghost elemsSet seq[any])
+
+/*
+ghost
+ensures toSet(seq1) === toSet(seq2) ==> res
+ensures toSet(seq1) !== toSet(seq2) ==> !res
+pure func haveSameElements(ghost seq1 seq[any], ghost seq2 seq[any]) (res bool){
+	return toSet(seq1) === toSet(seq2)
+}
+*/
+
+ghost
+requires x.Mem(elemsSeq)
+ensures forall e any :: e in elemsSeq ==> e in elemsSet
+pure func (x IntSlice) toSet(ghost elemsSeq seq[any]) (ghost elemsSet seq[any])
+
+
+
