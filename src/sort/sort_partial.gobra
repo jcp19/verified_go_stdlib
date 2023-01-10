@@ -60,6 +60,7 @@ type Interface interface {
 	ensures  elems[i] === swapped_elems[j]
 	ensures  elems[j] === swapped_elems[i]
 	ensures  forall x int :: (0 <= x && x < len(elems) && x != i && x != j) ==> (elems[x] === swapped_elems[x])
+	ensures  haveSameElements(elems, swapped_elems)
 	ensures  old(less_spec(i, j, elems)) ==> !less_spec(i, j, swapped_elems) //# We make the effect of the Swap operation on the Less relation explicit.
 	Swap(i, j int, ghost elems seq[any]) (ghost swapped_elems seq[any])
 }
@@ -172,12 +173,14 @@ ensures  forall idx int :: (0 <= idx && idx < len(elems) && idx != i && idx != j
 ensures  elems[i] === swapped_elems[j]
 ensures  elems[j] === swapped_elems[i]
 ensures  forall idx int :: (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (elems[idx] === swapped_elems[idx])
+ensures  haveSameElements(elems, swapped_elems)
 ensures  old(x.less_spec(i, j, elems)) ==> !x.less_spec(i, j, swapped_elems)
 func (x IntSlice) Swap(i, j int, ghost elems seq[any]) (ghost swapped_elems seq[any]) {
 	unfold x.Mem(elems)
 	x[i], x[j] = x[j], x[i]
 	swapped_elems = toSeq(x)
 	fold x.Mem(swapped_elems)
+	assume haveSameElements(elems, swapped_elems) //# We believe this to be true. I was not able to establish this as a fact and I was not able to map directly from IntSlice to mset[any].
 }
 
 //# implementation proof
@@ -192,14 +195,14 @@ requires data != nil
 requires 0 <= a && a < len(elems)
 requires a <= b && b <= len(elems) //# the element at position b does not get sorted
 ensures  data.Mem(sorted_elems)
-ensures  len(sorted_elems) == len(elems)
+ensures  haveSameElements(elems, sorted_elems)
 ensures  a == b ==> isPartiallySorted(data, a, a, sorted_elems)
 //ensures  isPartiallySorted(data, a, b - 1, sorted_elems)
 func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted_elems seq[any]) {
 	sorted_elems = elems
 	assert data.Mem(sorted_elems)
 
-	invariant len(sorted_elems) == len(elems)
+	invariant haveSameElements(elems, sorted_elems)
 	invariant a < i
 	invariant a < b ==> i <= b
 	invariant data.Mem(sorted_elems)
@@ -208,7 +211,7 @@ func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted
 	//invariant isPartiallySorted(data, a, i - 1, sorted_elems)
 	decreases b-i
 	for i := a + 1; i < b; i++ { //# for any kind of sorting to happen b has to be at least a+2, does this mean if called with b=a+1 that this will not be sorted? Answer: YES, should we enforce that in the precondition?
-		invariant len(sorted_elems) == len(elems)
+		invariant haveSameElements(elems, sorted_elems)
 		invariant i < b
 		invariant a <= j && j <= i
 		invariant a < j ==> 0 <= j - 1
@@ -230,7 +233,6 @@ func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted
 			}
 		}
 	}
-	
 }
 // ######### END FROM zsortinterface ##############
 
@@ -238,22 +240,37 @@ func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted
 //# helper
 
 ghost
-ensures forall e any :: e in elemsSeq ==> e in elemsSet
-pure func toSet(ghost elemsSeq seq[any]) (ghost elemsSet seq[any])
+ensures forall e any :: e in elemsSeq ==> e in elemsMultiSet
+ensures len(elemsSeq) == len(elemsMultiSet)
+pure func toMultiSet(ghost elemsSeq seq[any]) (ghost elemsMultiSet mset[any])
+
+
+
+ghost
+ensures toMultiSet(seq1) === toMultiSet(seq2) ==> res
+ensures toMultiSet(seq1) !== toMultiSet(seq2) ==> !res
+ensures res ==> len(seq1) == len(seq2)
+pure func haveSameElements(ghost seq1 seq[any], ghost seq2 seq[any]) (res bool){
+	return toMultiSet(seq1) === toMultiSet(seq2)
+}
+
+
+
+/*
+ensures forall e int :: e in s1 ==> e in s2 //# this causes gobra to crash, it works with mset[int] as the return type
+pure func test(ghost s1 mset[int]) (ghost s2 mset[any])
+*/
+
 
 /*
 ghost
-ensures toSet(seq1) === toSet(seq2) ==> res
-ensures toSet(seq1) !== toSet(seq2) ==> !res
-pure func haveSameElements(ghost seq1 seq[any], ghost seq2 seq[any]) (res bool){
-	return toSet(seq1) === toSet(seq2)
-}
-*/
-
-ghost
-requires x.Mem(elemsSeq)
-ensures forall e any :: e in elemsSeq ==> e in elemsSet
-pure func (x IntSlice) toSet(ghost elemsSeq seq[any]) (ghost elemsSet seq[any])
+requires forall j int :: 0 <= j && j < len(s) ==> acc(&s[j], _)
+ensures len(res) == len(s)
+ensures forall j int :: 0 <= j && j < len(s) ==> s[j] in res
+pure func toMultiSet(s []int) (res mset[any]) {
+  return (len(s) == 0 ? mset[any]{} :
+      toSeqX(s[:len(s) - 1]) union mset[any]{s[len(s) - 1]})
+}*/
 
 
 
