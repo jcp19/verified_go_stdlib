@@ -17,7 +17,7 @@ pred (l *List) Mem(ghost s set[*Element], ghost isInit bool) {
 	acc(&l.lenT) &&
 	&l.root in s &&
 	l.lenT == len(s)-1 &&
-	(forall i *Element :: i in s ==> (acc(&i.next) && acc(&i.prev) && acc(&i.list) && acc(&i.Value))) &&
+	(forall i *Element :: {i in s} i in s ==> (acc(&i.next) && acc(&i.prev) && acc(&i.list) && acc(&i.Value))) &&
 	((l.root.next == nil || l.root.prev == nil) ==> !isInit) &&
 	(!isInit ==> (
 		len(s) == 1 &&
@@ -26,7 +26,7 @@ pred (l *List) Mem(ghost s set[*Element], ghost isInit bool) {
 		l.root.prev == nil)) &&
 	(isInit ==> (
 		len(s) >= 1 &&
-		(forall i *Element :: i in s ==> (i.next != nil && i.prev != nil && (i != &l.root ==> i.list == l))) &&
-		(forall i, j *Element :: (i in s && i.next == j) ==> (j in s && j.prev == i && i.next.prev == i && j.prev.next == j)) &&
+		(forall i *Element :: {i in s} i in s ==> (i.next != nil && i.prev != nil && (i != &l.root ==> i.list == l))) &&
+		(forall i, j *Element :: {i.next == j} (i in s && i.next == j) ==> (j in s && j.prev == i && i.next.prev == i && j.prev.next == j)) &&
 		(forall i, j *Element :: (i in s && i.prev == j) ==> (j in s && j.next == i && i.prev.next == i && j.next.prev == j))))
 }
