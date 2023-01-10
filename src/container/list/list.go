@@ -219,9 +219,8 @@ func (l *List) remove(e *Element /*@, ghost elems set[*Element] @*/) {
 //@ ensures  l.Mem(elems, true)
 //@ ensures  (e != at ==> (unfolding l.Mem(elems, true) in (at.next == e && e.prev == at)))
 //# The next two lines are intended to help us reason about the element's position after it has been moved.
-//# Verification just for these additional 2 lines takes more than 1 hour on my machine. I will uncomment and test this as soon as the rest is done.
-// ensures  ((e != at && old(unfolding l.Mem(elems, true) in at.next != e)) ==> (unfolding l.Mem(elems, true) in (e.next == old(unfolding l.Mem(elems, true) in at.next)))) //# included to help us reason about the moved element in MoveToBack, MoveBefore
-// ensures  ((e != at && old(unfolding l.Mem(elems, true) in at.next != e)) ==> (unfolding l.Mem(elems, true) in (old(unfolding l.Mem(elems, true) in at.next).prev == e))) //# included to help us reason about the moved element in MoveToBack, MoveBefore
+//@ ensures  (e != at && old(at.nextPure(elems, l) != e)) ==> e.nextPure(elems, l) == old(at.nextPure(elems, l))
+//@ ensures  (e != at && old(at.nextPure(elems, l) != e)) ==> old(at.nextPure(elems, l)).prevPure(elems, l) == e
 //@ decreases
 func (l *List) move(e, at *Element /*@, ghost elems set[*Element] @*/) {
 	if e == at {
