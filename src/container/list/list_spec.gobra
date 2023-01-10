@@ -5,6 +5,34 @@ package list
 //# This constant serves as the permission amount used for partial read permissions throughout this package
 ghost const ReadPerm perm = 1/2
 
+ghost
+requires list.Mem(elems, true)
+requires e in elems
+ensures  res == (unfolding list.Mem(elems, true) in e.next)
+ensures  unfolding list.Mem(elems, true) in res in elems
+pure
+func (e *Element) nextPure(ghost elems set[*Element], ghost list *List) (res *Element) {
+	return unfolding list.Mem(elems, true) in e.next
+}
+
+ghost
+requires list.Mem(elems, true)
+requires e in elems
+ensures  res == (unfolding list.Mem(elems, true) in e.prev)
+ensures  unfolding list.Mem(elems, true) in res in elems
+pure
+func (e *Element) prevPure(ghost elems set[*Element], ghost list *List) (res *Element) {
+	return unfolding list.Mem(elems, true) in e.prev
+}
+
+ghost
+requires l.Mem(elems, true)
+requires e1 in elems && e2 in elems
+ensures  unfolding l.Mem(elems, true) in (e1.next == e2 && e2.prev == e1) == res
+pure
+func (e1 *Element) comesBefore(e2 *Element, ghost elems set[*Element], ghost l *List) (res bool) {
+	return unfolding l.Mem(elems, true) in (e1.next == e2 && e2.prev == e1)
+}
 
 //# This predicate abstracts over the permissions and consistency guarantees of a list l and its contained elements.
 //# Holding this predicate gives permissions to the underlying list l and the fields of all its elements.
