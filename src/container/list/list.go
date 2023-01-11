@@ -239,6 +239,17 @@ func (l *List) move(e, at *Element /*@, ghost elems set[*Element] @*/) {
 	//@ fold l.Mem(elems, true)
 }
 
+//### EXPLANATION IFF ###//
+//# The developers included a comment in the implementation that explains how it is required for the list to have been initialized if 'e.list==l'.
+//# If 'l' were not initialized then the call to 'l.remove(e)' could result in a crash.
+//# We know from the predicate that in an initialized list 'l' if 'e in elems' then 'e.list == l".
+//# We further want to establish that if 'e.list == l' then 'e in elems', i.e. we want to establish (e.list == l) IFF (e in elems).
+//# This helps us to establish that we have permissions to the fields of 'e' via the predicate from the knowledge gathered in the control flow.
+//# However, if '!(e in elems)' then we wouldn't have permissions to even check 'e.list == l'.
+//# We therefore need an additional precondition 'requires !(e in elems) ==> acc(e)' to be guaranteed to have permissions to 'e.list' exactly once.
+//# With 'requires unfolding l.Mem(elems, true) in (e.list == l) == (e in elems)' we can then establish the required equivalence.
+//# The 'unfolding' in this line only has an effect on the permissions of 'e.list' if we had 'e in elems'.
+//# Otherwise, the permission to 'e.list' come from the precondition 'requires !(e in elems) ==> acc(e)'.
 // Remove removes e from l if e is an element of list l.
 // It returns the element value e.Value.
 // The element must not be nil.
@@ -298,7 +309,7 @@ func (l *List) PushBack(v any /*@, ghost elems set[*Element], ghost isInit bool 
 //@ requires mark != nil
 //@ requires mark != &l.root
 //@ requires l.Mem(elems, true) //# Same as 'Remove', we only accept initialized lists and disallow the crash.
-//# The next two lines aim to establish: (mark.list == l) IFF (mark in elems)
+//# The next two lines aim to establish: (mark.list == l) IFF (mark in elems), see top comment in 'Remove' for detailed explanation
 //@ requires !(mark in elems) ==> (acc(mark) && mark.list != l)
 //@ requires unfolding l.Mem(elems, true) in (mark.list == l) == (mark in elems)
 //@ ensures  (mark in elems) ==> l.Mem(elems union set[*Element]{res}, true)
@@ -323,7 +334,7 @@ func (l *List) InsertBefore(v any, mark *Element /*@, ghost elems set[*Element] 
 //@ requires mark != nil
 //@ requires mark != &l.root
 //@ requires l.Mem(elems, true) //# Same as 'Remove', we only accept initialized lists and disallow the crash.
-//# The next two lines aim to establish: (mark.list == l) IFF (mark in elems)
+//# The next two lines aim to establish: (mark.list == l) IFF (mark in elems), see top comment in 'Remove' for detailed explanation
 //@ requires !(mark in elems) ==> (acc(mark) && mark.list != l)
 //@ requires unfolding l.Mem(elems, true) in (mark.list == l) == (mark in elems)
 //@ ensures  (mark in elems) ==> l.Mem(elems union set[*Element]{res}, true)
@@ -349,7 +360,7 @@ func (l *List) InsertAfter(v any, mark *Element /*@, ghost elems set[*Element] @
 //@ requires e != &l.root
 //@ requires l.Mem(elems, true) //# Same as 'Remove', we only accept initialized lists and disallow the crash.
 //@ requires &l.root in elems   //# This is given by the predicate but explicitly necessary for the postcondition to work without unfolding
-//# The next two lines aim to establish: (e.list == l) IFF (e in elems)
+//# The next two lines aim to establish: (e.list == l) IFF (e in elems), see top comment in 'Remove' for detailed explanation
 //@ requires !(e in elems) ==> (acc(e) && e.list != l)
 //@ requires unfolding l.Mem(elems, true) in (e.list == l) == (e in elems)
 //@ ensures  l.Mem(elems, true)
@@ -374,7 +385,7 @@ func (l *List) MoveToFront(e *Element /*@, ghost elems set[*Element] @*/) {
 //@ requires e != &l.root
 //@ requires l.Mem(elems, true) //# Same as 'Remove', we only accept initialized lists and disallow the crash.
 //@ requires &l.root in elems   //# This is given by the predicate but explicitly necessary for the postcondition to work without unfolding
-//# The next two lines aim to establish: (e.list == l) IFF (e in elems)
+//# The next two lines aim to establish: (e.list == l) IFF (e in elems), see top comment in 'Remove' for detailed explanation
 //@ requires !(e in elems) ==> (acc(e) && e.list != l)
 //@ requires unfolding l.Mem(elems, true) in (e.list == l) == (e in elems)
 //@ ensures  l.Mem(elems, true)
@@ -400,10 +411,10 @@ func (l *List) MoveToBack(e *Element /*@, ghost elems set[*Element] @*/) {
 //@ requires mark != nil
 //@ requires mark != &l.root
 //@ requires l.Mem(elems, true)
-//# (e.list == l) IFF (e in elems)
+//# (e.list == l) IFF (e in elems), see top comment in 'Remove' for detailed explanation
 //@ requires !(e in elems) ==> (acc(e) && e.list != l)
 //@ requires unfolding l.Mem(elems, true) in (e.list == l) == (e in elems)
-//# (mark.list == l) IFF (mark in elems)
+//# (mark.list == l) IFF (mark in elems), see top comment in 'Remove' for detailed explanation
 //@ requires !(mark in elems) ==> (acc(mark) && mark.list != l)
 //@ requires unfolding l.Mem(elems, true) in (mark.list == l) == (mark in elems)
 //@ ensures  l.Mem(elems, true)
@@ -428,10 +439,10 @@ func (l *List) MoveBefore(e, mark *Element /*@, ghost elems set[*Element] @*/) {
 //@ requires mark != nil
 //@ requires mark != &l.root
 //@ requires l.Mem(elems, true)
-//# (e.list == l) IFF (e in elems)
+//# (e.list == l) IFF (e in elems), see top comment in 'Remove' for detailed explanation
 //@ requires !(e in elems) ==> (acc(e) && e.list != l)
 //@ requires unfolding l.Mem(elems, true) in (e.list == l) == (e in elems)
-//# (mark.list == l) IFF (mark in elems)
+//# (mark.list == l) IFF (mark in elems), see top comment in 'Remove' for detailed explanation
 //@ requires !(mark in elems) ==> (acc(mark) && mark.list != l)
 //@ requires unfolding l.Mem(elems, true) in (mark.list == l) == (mark in elems)
 //@ ensures  l.Mem(elems, true)
@@ -447,6 +458,18 @@ func (l *List) MoveAfter(e, mark *Element /*@, ghost elems set[*Element] @*/) {
 	//@ fold l.Mem(elems, true)
 	l.move(e, mark /*@, elems @*/)
 }
+
+//# Both 'PushBackList' and 'PushFrontList' could not yet be successfully verified.
+//# Neither code, nor comment make explicitly clear that they expect 'other' to already be initialized.
+//# This is not a problem if l==other since both methods call l.lazyInit(..) to make sure l is initialized.
+//# Therefore it makes sense to have 'requires (l != other) ==> (other.Mem(elemsOther, true))' as a precondition and enfore 'other' to be initialized.
+//# For the loop invariant there is a difficulty in establishing the relationship between the decreasing i
+//# and the advances along the list in the calls to 'e.Next(..)' and 'e.Prev(..)' respectively.
+//# If l!=other then we want that i==0 at the same time as 'e.Next/Prev(..)' returns nil.
+//# If l==other then this is not the case since the head/tail of the list gets continually updated.
+//# We need to establish that the 'Len()' many calls to 'e.Next/Prev(..)' returned us every element of the original list exactly once.
+//# Another issue is that the elements get cloned (i.e. we call 'insertValue' in the loop) which has the challenge
+//# of establishing a postcondition that l's elements now contain all the original elements from 'elemsL' and clones from 'elemsOther'. 
 
 // PushBackList inserts a copy of another list at the back of list l.
 // The lists l and other may be the same. They must not be nil.
