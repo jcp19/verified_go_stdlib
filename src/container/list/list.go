@@ -162,8 +162,8 @@ func (l *List) lazyInit(/*@ ghost elems set[*Element], ghost isInit bool @*/) {
 //@ ensures  l.Mem(elems union set[*Element]{e}, true)
 //@ ensures  l.Len(elems union set[*Element]{e}, true) == 1 + old(l.Len(elems, true))
 //@ ensures  at.comesBefore(e, elems union set[*Element]{e}, l)
-//@ ensures  old(at.nextPure(elems, l)).prevPure(elems union set[*Element]{e}, l) == e
-//@ ensures  old(at.nextPure(elems, l)) == e.nextPure(elems union set[*Element]{e}, l)
+//@ ensures  at.comesBefore(e, elems union set[*Element]{e}, l)
+//@ ensures  e.comesBefore(old(at.nextPure(elems, l)), elems union set[*Element]{e}, l)
 //@ ensures  res == e
 //@ decreases
 func (l *List) insert(e, at *Element /*@, ghost elems set[*Element] @*/) (res *Element) {
@@ -184,8 +184,8 @@ func (l *List) insert(e, at *Element /*@, ghost elems set[*Element] @*/) (res *E
 //@ ensures  l.Mem(elems union set[*Element]{res}, true)
 //@ ensures  l.Len(elems union set[*Element]{res}, true) == 1 + old(l.Len(elems, true))
 //@ ensures  at.comesBefore(res, elems union set[*Element]{res}, l)
-//@ ensures  old(at.nextPure(elems, l)).prevPure(elems union set[*Element]{res}, l) == res
-//@ ensures  old(at.nextPure(elems, l)) == res.nextPure(elems union set[*Element]{res}, l)
+//@ ensures  at.comesBefore(res, elems union set[*Element]{res}, l)
+//@ ensures  res.comesBefore(old(at.nextPure(elems, l)), elems union set[*Element]{res}, l)
 //@ decreases
 func (l *List) insertValue(v any, at *Element /*@, ghost elems set[*Element] @*/) (res *Element) {
 	res = &Element{Value: v}
@@ -218,9 +218,8 @@ func (l *List) remove(e *Element /*@, ghost elems set[*Element] @*/) {
 //@ requires at in elems
 //@ ensures  l.Mem(elems, true)
 //@ ensures  (e != at ==> (unfolding l.Mem(elems, true) in (at.next == e && e.prev == at)))
-//# The next two lines are intended to help us reason about the element's position after it has been moved.
-//@ ensures  (e != at && old(at.nextPure(elems, l) != e)) ==> e.nextPure(elems, l) == old(at.nextPure(elems, l))
-//@ ensures  (e != at && old(at.nextPure(elems, l) != e)) ==> old(at.nextPure(elems, l)).prevPure(elems, l) == e
+//@ ensures  (e != at && old(at.nextPure(elems, l) != e)) ==> at.comesBefore(e, elems, l)
+//@ ensures  (e != at && old(at.nextPure(elems, l) != e)) ==> e.comesBefore(old(at.nextPure(elems, l)), elems, l)
 //@ decreases
 func (l *List) move(e, at *Element /*@, ghost elems set[*Element] @*/) {
 	if e == at {
@@ -273,7 +272,7 @@ func (l *List) Remove(e *Element /*@, ghost elems set[*Element] @*/) (res any) {
 //@ requires &l.root in elems //# This is given by the predicate but explicitly necessary for the postcondition to work without unfolding
 //@ ensures  l.Mem(elems union set[*Element]{res}, true)
 //@ ensures  l.Len(elems union set[*Element]{res}, true) == 1 + old(l.Len(elems, isInit))
-//@ ensures  l.root.comesBefore(res, elems union set[*Element]{res}, l)  //# This is what we want to know about res' position
+//@ ensures  l.root.comesBefore(res, elems union set[*Element]{res}, l)
 //@ decreases
 func (l *List) PushFront(v any /*@, ghost elems set[*Element], ghost isInit bool @*/) (res *Element) {
 	l.lazyInit(/*@ elems, isInit @*/)
@@ -286,7 +285,7 @@ func (l *List) PushFront(v any /*@, ghost elems set[*Element], ghost isInit bool
 //@ requires &l.root in elems //# This is given by the predicate but explicitly necessary for the postcondition to work without unfolding
 //@ ensures  l.Mem(elems union set[*Element]{res}, true)
 //@ ensures  l.Len(elems union set[*Element]{res}, true) == 1 + old(l.Len(elems, isInit))
-//@ ensures  res.comesBefore(&l.root, elems union set[*Element]{res}, l)  //# This is what we want to know about res' position
+//@ ensures  res.comesBefore(&l.root, elems union set[*Element]{res}, l)
 //@ decreases
 func (l *List) PushBack(v any /*@, ghost elems set[*Element], ghost isInit bool @*/) (res *Element) {
 	l.lazyInit(/*@ elems, isInit @*/)
@@ -304,7 +303,8 @@ func (l *List) PushBack(v any /*@, ghost elems set[*Element], ghost isInit bool 
 //@ requires unfolding l.Mem(elems, true) in (mark.list == l) == (mark in elems)
 //@ ensures  (mark in elems) ==> l.Mem(elems union set[*Element]{res}, true)
 //@ ensures  !(mark in elems) ==> l.Mem(elems, true)
-//@ ensures  (mark in elems) ==> res.comesBefore(mark, elems union set[*Element]{res}, l)  //# This is what we want to know about res' position
+//@ ensures  (mark in elems) ==> res.comesBefore(mark, elems union set[*Element]{res}, l)
+//@ ensures  (mark in elems) ==> old(mark.prevPure(elems, l)).comesBefore(res, elems union set[*Element]{res}, l)
 //@ decreases
 func (l *List) InsertBefore(v any, mark *Element /*@, ghost elems set[*Element] @*/) (res *Element) {
 	//@ unfold l.Mem(elems, true)
@@ -328,7 +328,8 @@ func (l *List) InsertBefore(v any, mark *Element /*@, ghost elems set[*Element] 
 //@ requires unfolding l.Mem(elems, true) in (mark.list == l) == (mark in elems)
 //@ ensures  (mark in elems) ==> l.Mem(elems union set[*Element]{res}, true)
 //@ ensures  !(mark in elems) ==> l.Mem(elems, true)
-//@ ensures  (mark in elems) ==> mark.comesBefore(res, elems union set[*Element]{res}, l)  //# This is what we want to know about res' position
+//@ ensures  (mark in elems) ==> mark.comesBefore(res, elems union set[*Element]{res}, l)
+//@ ensures  (mark in elems) ==> res.comesBefore(old(mark.nextPure(elems, l)), elems union set[*Element]{res}, l)
 //@ decreases
 func (l *List) InsertAfter(v any, mark *Element /*@, ghost elems set[*Element] @*/) (res *Element) {
 	//@ unfold l.Mem(elems, true)
@@ -352,7 +353,8 @@ func (l *List) InsertAfter(v any, mark *Element /*@, ghost elems set[*Element] @
 //@ requires !(e in elems) ==> (acc(e) && e.list != l)
 //@ requires unfolding l.Mem(elems, true) in (e.list == l) == (e in elems)
 //@ ensures  l.Mem(elems, true)
-//@ ensures  (e in elems) ==> l.root.comesBefore(e, elems, l)
+//@ ensures  (e in elems && e != old(l.root.nextPure(elems, l))) ==> l.root.comesBefore(e, elems, l)
+//@ ensures  (e in elems && e != old(l.root.nextPure(elems, l))) ==> e.comesBefore(old(l.root.nextPure(elems, l)), elems, l)
 //@ decreases
 func (l *List) MoveToFront(e *Element /*@, ghost elems set[*Element] @*/) {
 	//@ unfold l.Mem(elems, true)
@@ -371,11 +373,13 @@ func (l *List) MoveToFront(e *Element /*@, ghost elems set[*Element] @*/) {
 //@ requires e != nil
 //@ requires e != &l.root
 //@ requires l.Mem(elems, true) //# Same as 'Remove', we only accept initialized lists and disallow the crash.
+//@ requires &l.root in elems   //# This is given by the predicate but explicitly necessary for the postcondition to work without unfolding
 //# The next two lines aim to establish: (e.list == l) IFF (e in elems)
 //@ requires !(e in elems) ==> (acc(e) && e.list != l)
 //@ requires unfolding l.Mem(elems, true) in (e.list == l) == (e in elems)
 //@ ensures  l.Mem(elems, true)
-//# We still need to reason about e's position after the move.
+//@ ensures (e != old(l.root.prevPure(elems, l)) && e != old(l.root.prevPure(elems, l).nextPure(elems, l)) && e in elems) ==> old(l.root.prevPure(elems, l)).comesBefore(e, elems, l)
+//@ ensures (e != old(l.root.prevPure(elems, l)) && e != old(l.root.prevPure(elems, l).nextPure(elems, l)) && e in elems) ==> e.comesBefore(old(l.root.prevPure(elems, l).nextPure(elems, l)), elems, l)
 //@ decreases
 func (l *List) MoveToBack(e *Element /*@, ghost elems set[*Element] @*/) {
 	//@ unfold l.Mem(elems, true)
@@ -403,7 +407,8 @@ func (l *List) MoveToBack(e *Element /*@, ghost elems set[*Element] @*/) {
 //@ requires !(mark in elems) ==> (acc(mark) && mark.list != l)
 //@ requires unfolding l.Mem(elems, true) in (mark.list == l) == (mark in elems)
 //@ ensures  l.Mem(elems, true)
-//# We still need to reason about e's position after the move.
+//@ ensures (e in elems && mark in elems && e != old(mark.prevPure(elems, l)) && e != old(mark.prevPure(elems, l).nextPure(elems, l))) ==> old(mark.prevPure(elems, l)).comesBefore(e, elems, l)
+//@ ensures (e in elems && mark in elems && e != old(mark.prevPure(elems, l)) && e != old(mark.prevPure(elems, l).nextPure(elems, l))) ==> e.comesBefore(old(mark.prevPure(elems, l).nextPure(elems, l)), elems, l)
 //@ decreases
 func (l *List) MoveBefore(e, mark *Element /*@, ghost elems set[*Element] @*/) {
 	//@ unfold l.Mem(elems, true)
@@ -430,7 +435,8 @@ func (l *List) MoveBefore(e, mark *Element /*@, ghost elems set[*Element] @*/) {
 //@ requires !(mark in elems) ==> (acc(mark) && mark.list != l)
 //@ requires unfolding l.Mem(elems, true) in (mark.list == l) == (mark in elems)
 //@ ensures  l.Mem(elems, true)
-//@ ensures  (mark != e && e in elems && mark in elems) ==> mark.comesBefore(e, elems, l)
+//@ ensures  (mark != e && e in elems && mark in elems && e != old(mark.nextPure(elems, l))) ==> mark.comesBefore(e, elems, l)
+//@ ensures  (mark != e && e in elems && mark in elems && e != old(mark.nextPure(elems, l))) ==> e.comesBefore(old(mark.nextPure(elems, l)), elems, l)
 //@ decreases
 func (l *List) MoveAfter(e, mark *Element /*@, ghost elems set[*Element] @*/) {
 	//@ unfold l.Mem(elems, true)
