@@ -10,14 +10,16 @@ package sort
 
 //import "math/bits" //# Had to comment this out, otherwise verification progress does not go above 3%
 
+ghost const ReadPerm perm = 1/2
+
 // An implementation of Interface can be sorted by the routines in this package.
 // The methods refer to elements of the underlying collection by integer index.
 type Interface interface {
 	pred Mem(ghost s seq[any])
 
 	// Len is the number of elements in the collection.
-	requires acc(Mem(elems), 1/2)
-	ensures  acc(Mem(elems), 1/2)
+	requires acc(Mem(elems), ReadPerm)
+	ensures  acc(Mem(elems), ReadPerm)
 	ensures  res == len(elems)
 	ensures  res >= 0
 	Len(ghost elems seq[any]) (res int)
@@ -42,10 +44,10 @@ type Interface interface {
 	// Note that floating-point comparison (the < operator on float32 or float64 values)
 	// is not a transitive ordering when not-a-number (NaN) values are involved.
 	// See Float64Slice.Less for a correct implementation for floating-point values.
-	requires acc(Mem(elems), 1/2)
+	requires acc(Mem(elems), ReadPerm)
 	requires 0 <= i && i < len(elems)
 	requires 0 <= j && j < len(elems)
-	ensures  acc(Mem(elems), 1/2)
+	ensures  acc(Mem(elems), ReadPerm)
 	ensures  res == less_spec(i, j, elems)
 	Less(i, j int, ghost elems seq[any]) (res bool)
 
@@ -66,7 +68,7 @@ type Interface interface {
 }
 
 
-//# LOTS IN BETWEEN.....
+//# PLACEHOLDER: Here would be more code from the original sort.go file.
 
 ghost
 requires data != nil
@@ -76,7 +78,8 @@ requires start <= end && end < len(elems)
 ensures  end - start == 0 ==> res == true
 ensures  (end - start > 0 && !data.less_spec(end, end - 1, elems)) ==> res == isPartiallySorted(data, start, end - 1, elems)
 ensures  (end - start > 0 &&  data.less_spec(end, end - 1, elems)) ==> !res
-//ensures  res ==> (forall idx int :: ((start < idx && idx <= end) ==> !data.less_spec(idx, idx - 1, elems))) //# Would like to be able to infer that
+//ensures  res ==> (forall idx int :: ((start < idx && idx <= end) ==> !data.less_spec(idx, idx - 1, elems))) 
+//# The below line verifies and should just be an unrolled version of the above line in cases were start+2 < end. However, the above line does not verify.
 //ensures (res && start+2 < end) ==> !data.less_spec(end, end - 1, elems) && !data.less_spec(end-1, end - 2, elems) && !data.less_spec(end-2, end-3, elems)
 pure
 func isPartiallySorted(data Interface, start, end int, ghost elems seq[any]) (res bool) {
@@ -132,9 +135,9 @@ pred (x IntSlice) Mem(ghost s seq[any]){
 	forall j int :: {x[j]} {s[j]} 0 <= j && j < len(s) ==> x[j] == s[j]
 }
 
-requires acc(x.Mem(elems), 1/2)
-ensures  acc(x.Mem(elems), 1/2)
-ensures  unfolding acc(x.Mem(elems), 1/2) in res == len(elems)
+requires acc(x.Mem(elems), ReadPerm)
+ensures  acc(x.Mem(elems), ReadPerm)
+ensures  unfolding acc(x.Mem(elems), ReadPerm) in res == len(elems)
 ensures  res >= 0
 func (x IntSlice) Len(ghost elems seq[any]) (res int) {
 	return len(x)
@@ -149,25 +152,23 @@ pure func (x IntSlice) less_spec(i, j int, ghost elems seq[any]) (res bool){
 }
 
 
-requires acc(x.Mem(elems), 1/2)
+requires acc(x.Mem(elems), ReadPerm)
 requires 0 <= i && i < len(elems)
 requires 0 <= j && j < len(elems)
-ensures  acc(x.Mem(elems), 1/2)
+ensures  acc(x.Mem(elems), ReadPerm)
 ensures  res == x.less_spec(i, j, elems)
 func (x IntSlice) Less(i, j int, ghost elems seq[any]) (res bool) {
-	return unfolding acc(x.Mem(elems), 1/2) in x[i] < x[j]
+	return unfolding acc(x.Mem(elems), ReadPerm) in x[i] < x[j]
 }
 
 requires x.Mem(elems)
 requires 0 <= i && i < len(elems)
 requires 0 <= j && j < len(elems)
 ensures  x.Mem(swapped_elems)
-ensures  len(elems) == len(swapped_elems) //# somehow this does not suffice to infer i and j are in range [0, len(swapped_elems)-1]
-ensures  0 <= i && i < len(elems) && i < len(swapped_elems) //# possibly make Len() pure and use that
-ensures  0 <= j && j < len(elems) && j < len(swapped_elems) //# possibly make Len() pure and use that
+ensures  len(elems) == len(swapped_elems) //# Somehow this does not suffice to infer i and j are in range [0, len(swapped_elems)-1] and it needs to be stated explicitly below.
+ensures  0 <= i && i < len(elems) && i < len(swapped_elems)
+ensures  0 <= j && j < len(elems) && j < len(swapped_elems)
 //# This line is required..
-//ensures  old(unfolding x.Mem(elems) in x[i]) == (unfolding x.Mem(swapped_elems) in x[j])
-//ensures  old(unfolding x.Mem(elems) in x[j]) == (unfolding x.Mem(swapped_elems) in x[i])
 ensures  forall idx int :: (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (old(unfolding x.Mem(elems) in x[idx]) == (unfolding x.Mem(swapped_elems) in x[idx]))
 //# ..for these 3 corresponding lines to work.
 ensures  elems[i] === swapped_elems[j]
@@ -188,7 +189,7 @@ func (x IntSlice) Swap(i, j int, ghost elems seq[any]) (ghost swapped_elems seq[
 
 
 
-// ######### BEGIN FROM zsortinterface ##############
+// ######### BEGIN FROM zsortinterface.go ##############
 // insertionSort sorts data[a:b] using insertion sort.
 requires data.Mem(elems)
 requires data != nil
@@ -221,7 +222,7 @@ func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted
 		//invariant isPartiallySorted(data, a, XXX, sorted_elems)
 		//invariant isPartiallySorted(data, YYY, i, sorted_elems)
 		decreases j-a
-		for j := i; j > a /*&& data.Less(j, j - 1, elems)*/; j-- {
+		for j := i; j > a /*&& data.Less(j, j - 1, elems)*/; j-- { //# The second conjunct in the loop condition was commented out. See comment below.
 			assert 0 <= j - 1
 			assert i < b
 			assert i < len(sorted_elems)
@@ -234,10 +235,10 @@ func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted
 		}
 	}
 }
-// ######### END FROM zsortinterface ##############
+// ######### END FROM zsortinterface.go ##############
 
 
-//# helper
+//# helper:
 
 ghost
 ensures forall e any :: e in elemsSeq ==> e in elemsMultiSet
@@ -270,7 +271,8 @@ ensures forall j int :: 0 <= j && j < len(s) ==> s[j] in res
 pure func toMultiSet(s []int) (res mset[any]) {
   return (len(s) == 0 ? mset[any]{} :
       toSeqX(s[:len(s) - 1]) union mset[any]{s[len(s) - 1]})
-}*/
+}
+*/
 
 
 
