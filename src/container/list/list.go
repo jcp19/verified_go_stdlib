@@ -35,7 +35,7 @@ type Element struct {
 //@ requires  e != &list.root
 //@ requires  e in elems //# Via the predicate, this already implies that e.list==nil cannot happen
 //@ ensures   unfolding list.Mem(elems, true) in (e.next == &e.list.root) ==> res == nil
-//@ ensures   unfolding list.Mem(elems, true) in (e.next != &e.list.root) ==> res == e.next
+//@ ensures   unfolding list.Mem(elems, true) in (e.next != &e.list.root) ==> (res == e.next && res != nil && res != &list.root)
 //@ decreases
 func (e *Element) Next(/*@ ghost elems set[*Element], ghost list *List @*/) (res *Element) {
 	//@ unfold list.Mem(elems, true)
@@ -51,7 +51,7 @@ func (e *Element) Next(/*@ ghost elems set[*Element], ghost list *List @*/) (res
 //@ requires  e != &list.root
 //@ requires  e in elems //# Via the predicate, this already implies that e.list==nil cannot happen
 //@ ensures   unfolding list.Mem(elems, true) in (e.prev == &e.list.root) ==> res == nil
-//@ ensures   unfolding list.Mem(elems, true) in (e.prev != &e.list.root) ==> res == e.prev
+//@ ensures   unfolding list.Mem(elems, true) in (e.prev != &e.list.root) ==> (res == e.prev && res != nil && res != &list.root)
 //@ decreases
 func (e *Element) Prev(/*@ ghost elems set[*Element], ghost list *List @*/) (res *Element) {
 	//@ unfold list.Mem(elems, true)
@@ -164,7 +164,7 @@ func (l *List) lazyInit(/*@ ghost elems set[*Element], ghost isInit bool @*/) {
 //@ ensures  at.comesBefore(e, elems union set[*Element]{e}, l)
 //@ ensures  at.comesBefore(e, elems union set[*Element]{e}, l)
 //@ ensures  e.comesBefore(old(at.nextPure(elems, l)), elems union set[*Element]{e}, l)
-//@ ensures  res == e
+//@ ensures  res == e && res != nil && res != &l.root
 //@ decreases
 func (l *List) insert(e, at *Element /*@, ghost elems set[*Element] @*/) (res *Element) {
 	//@ unfold l.Mem(elems, true)
@@ -186,6 +186,7 @@ func (l *List) insert(e, at *Element /*@, ghost elems set[*Element] @*/) (res *E
 //@ ensures  at.comesBefore(res, elems union set[*Element]{res}, l)
 //@ ensures  at.comesBefore(res, elems union set[*Element]{res}, l)
 //@ ensures  res.comesBefore(old(at.nextPure(elems, l)), elems union set[*Element]{res}, l)
+//@ ensures  res != nil && res != &l.root
 //@ decreases
 func (l *List) insertValue(v any, at *Element /*@, ghost elems set[*Element] @*/) (res *Element) {
 	res = &Element{Value: v}
@@ -284,6 +285,7 @@ func (l *List) Remove(e *Element /*@, ghost elems set[*Element] @*/) (res any) {
 //@ ensures  l.Mem(elems union set[*Element]{res}, true)
 //@ ensures  l.Len(elems union set[*Element]{res}, true) == 1 + old(l.Len(elems, isInit))
 //@ ensures  l.root.comesBefore(res, elems union set[*Element]{res}, l)
+//@ ensures  res != nil && res != &l.root
 //@ decreases
 func (l *List) PushFront(v any /*@, ghost elems set[*Element], ghost isInit bool @*/) (res *Element) {
 	l.lazyInit(/*@ elems, isInit @*/)
@@ -297,6 +299,7 @@ func (l *List) PushFront(v any /*@, ghost elems set[*Element], ghost isInit bool
 //@ ensures  l.Mem(elems union set[*Element]{res}, true)
 //@ ensures  l.Len(elems union set[*Element]{res}, true) == 1 + old(l.Len(elems, isInit))
 //@ ensures  res.comesBefore(&l.root, elems union set[*Element]{res}, l)
+//@ ensures  res != nil && res != &l.root
 //@ decreases
 func (l *List) PushBack(v any /*@, ghost elems set[*Element], ghost isInit bool @*/) (res *Element) {
 	l.lazyInit(/*@ elems, isInit @*/)
@@ -316,6 +319,7 @@ func (l *List) PushBack(v any /*@, ghost elems set[*Element], ghost isInit bool 
 //@ ensures  !(mark in elems) ==> l.Mem(elems, true)
 //@ ensures  (mark in elems) ==> res.comesBefore(mark, elems union set[*Element]{res}, l)
 //@ ensures  (mark in elems) ==> old(mark.prevPure(elems, l)).comesBefore(res, elems union set[*Element]{res}, l)
+//@ ensures  (mark in elems) ==> res != nil && res != &l.root
 //@ decreases
 func (l *List) InsertBefore(v any, mark *Element /*@, ghost elems set[*Element] @*/) (res *Element) {
 	//@ unfold l.Mem(elems, true)
@@ -341,6 +345,7 @@ func (l *List) InsertBefore(v any, mark *Element /*@, ghost elems set[*Element] 
 //@ ensures  !(mark in elems) ==> l.Mem(elems, true)
 //@ ensures  (mark in elems) ==> mark.comesBefore(res, elems union set[*Element]{res}, l)
 //@ ensures  (mark in elems) ==> res.comesBefore(old(mark.nextPure(elems, l)), elems union set[*Element]{res}, l)
+//@ ensures  (mark in elems) ==> res != nil && res != &l.root
 //@ decreases
 func (l *List) InsertAfter(v any, mark *Element /*@, ghost elems set[*Element] @*/) (res *Element) {
 	//@ unfold l.Mem(elems, true)
