@@ -162,7 +162,6 @@ func (l *List) lazyInit(/*@ ghost elems set[*Element], ghost isInit bool @*/) {
 //@ ensures  l.Mem(elems union set[*Element]{e}, true)
 //@ ensures  l.Len(elems union set[*Element]{e}, true) == 1 + old(l.Len(elems, true))
 //@ ensures  at.comesBefore(e, elems union set[*Element]{e}, l)
-//@ ensures  at.comesBefore(e, elems union set[*Element]{e}, l)
 //@ ensures  e.comesBefore(old(at.nextPure(elems, l)), elems union set[*Element]{e}, l)
 //@ ensures  res == e && res != nil && res != &l.root
 //@ decreases
@@ -183,7 +182,6 @@ func (l *List) insert(e, at *Element /*@, ghost elems set[*Element] @*/) (res *E
 //@ requires at in elems
 //@ ensures  l.Mem(elems union set[*Element]{res}, true)
 //@ ensures  l.Len(elems union set[*Element]{res}, true) == 1 + old(l.Len(elems, true))
-//@ ensures  at.comesBefore(res, elems union set[*Element]{res}, l)
 //@ ensures  at.comesBefore(res, elems union set[*Element]{res}, l)
 //@ ensures  res.comesBefore(old(at.nextPure(elems, l)), elems union set[*Element]{res}, l)
 //@ ensures  res != nil && res != &l.root
