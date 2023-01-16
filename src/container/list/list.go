@@ -75,6 +75,7 @@ type List struct {
 //@ requires l.Mem(elems, isInit)
 //@ ensures  res == l
 //@ ensures  l.Mem(set[*Element]{&l.root}, true)
+//@ ensures  isInit ==> (forall i *Element :: {i in elems} (i in elems && i != &l.root) ==> (acc(&i.next) && acc(&i.prev) && acc(&i.list) && acc(&i.Value)))
 //@ ensures  l.Len(set[*Element]{&l.root}, true) == 0
 //@ decreases
 func (l *List) Init(/*@ ghost elems set[*Element], ghost isInit bool @*/) (res *List) {
