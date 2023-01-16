@@ -194,7 +194,7 @@ func New(n int) (res *Ring /*@, ghost elems set[*Ring] @*/) {
 //@ ensures  res == old(unfolding r.Mem(elemsR, true) in r.next)
 //@ ensures  (s != nil && !(s in elemsR)) ==> res.Mem((elemsR union elemsS), true)
 //@ ensures  (s != nil && s in elemsR && r == s && len(elemsR) == 1) ==> res.Mem((elemsR), true)
-//# ensures  (s != nil && s in elemsR && r == s && len(elemsR) > 1) ==> res.Mem((elemsR setminus (set[*Ring]{r})), true) CANNOT FOLD
+//@ ensures  (s != nil && s in elemsR && r == s && len(elemsR) > 1) ==> res.Mem((elemsR setminus (set[*Ring]{r})), true)
 //# ensures  (s != nil && s in elemsR && r != s && len(elemsR) == 1) ==> UNIMPLEMENTED
 //@ decreases
 func (r *Ring) Link(s *Ring /*@, ghost elemsR set[*Ring], ghost elemsS set[*Ring] @*/) (res *Ring) {
@@ -232,12 +232,12 @@ func (r *Ring) Link(s *Ring /*@, ghost elemsR set[*Ring], ghost elemsS set[*Ring
 					fold n.Mem(elemsR, true)
 				}
 				ghost if len(elemsR) > 1 {
-					//# UNIMPLEMENTED
 					//# In this case r == s formed a ring structure that also contains other elements.
 					//# The resulting ring structure contains the same elements as before except r == s.
-					//# fold n.Mem((elemsR setminus (set[*Ring]{r})), true)
-					//# The fold does not succeed. This is likely due to the fact that the Mem predicate by itself
-					//# does not enforce that all the elements form a single ring structure.
+					//@ assume len(elemsR) > 2 ==> (forall i *Ring :: i in (elemsR setminus (set[*Ring]{r})) ==> (i.next != i && i.prev != i))
+					//# The assumption is necessary to fold the predicate. This is because the predicate does not enforce that all its elements form a single ring structure.
+					//# Thus, the prediate allows that initially r.next==r.prev even when len(elemsR) > 2.
+					//@ fold n.Mem((elemsR setminus (set[*Ring]{r})), true)
 				}
 			} else {
 				//# UNIMPLEMENTED
