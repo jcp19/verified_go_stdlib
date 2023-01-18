@@ -55,6 +55,6 @@ pred (l *List) Mem(ghost s set[*Element], ghost isInit bool) {
 	(isInit ==> (
 		len(s) >= 1 &&
 		(forall i *Element :: {i in s} i in s ==> (i.next != nil && i.prev != nil && (i != &l.root ==> i.list == l))) &&
-		(forall i, j *Element :: (i in s && i.next == j) ==> (j in s && j.prev == i && i.next.prev == i && j.prev.next == j)) &&
-		(forall i, j *Element :: (i in s && i.prev == j) ==> (j in s && j.next == i && i.prev.next == i && j.next.prev == j))))
+		(forall i, j *Element :: {i in s, j.prev.next} {i.next, j in s} (i in s && i.next == j) ==> (j in s && j.prev == i && i.next.prev == i && j.prev.next == j)) &&
+		(forall i, j *Element :: {i, j.prev} {j, i.next} {i in s, j in s} (i in s && i.prev == j) ==> (j in s && j.next == i && i.prev.next == i && j.next.prev == j)) ))
 }
