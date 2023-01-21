@@ -22,6 +22,7 @@ type Interface interface {
 	ensures  acc(Mem(elems), ReadPerm)
 	ensures  res == len(elems)
 	ensures  res >= 0
+	decreases
 	Len(ghost elems seq[any]) (res int)
 
 	// Less reports whether the element with index i
@@ -49,6 +50,7 @@ type Interface interface {
 	requires 0 <= j && j < len(elems)
 	ensures  acc(Mem(elems), ReadPerm)
 	ensures  res == less_spec(i, j, elems)
+	decreases
 	Less(i, j int, ghost elems seq[any]) (res bool)
 
 	// Swap swaps the elements with indexes i and j.
@@ -64,6 +66,7 @@ type Interface interface {
 	ensures  forall x int :: (0 <= x && x < len(elems) && x != i && x != j) ==> (elems[x] === swapped_elems[x]) //# find triggers
 	ensures  haveSameElements(elems, swapped_elems)
 	ensures  old(less_spec(i, j, elems)) ==> !less_spec(i, j, swapped_elems) //# We make the effect of the Swap operation on the Less relation explicit.
+	decreases
 	Swap(i, j int, ghost elems seq[any]) (ghost swapped_elems seq[any])
 }
 
@@ -91,6 +94,7 @@ preserves data.Mem(elems)
 requires  data != nil
 ensures   res ==> forall idx int :: {data.less_spec(idx, idx - 1, elems)} ((0 < idx && idx < len(elems)) ==> (!data.less_spec(idx, idx - 1, elems)))
 ensures   !res ==> !(forall idx int :: {data.less_spec(idx, idx - 1, elems)} ((0 < idx && idx < len(elems)) ==> (!data.less_spec(idx, idx - 1, elems))))
+decreases
 func IsSorted(data Interface, ghost elems seq[any]) (res bool) {
 	n := data.Len(elems)
 
@@ -123,6 +127,7 @@ ghost
 requires forall j int :: 0 <= j && j < len(s) ==> acc(&s[j], _) //# find triggers
 ensures len(res) == len(s)
 ensures forall j int :: {s[j]} {res[j]} 0 <= j && j < len(s) ==> s[j] == res[j]
+decreases len(s)
 pure func toSeq(s []int) (res seq[any]) {
   return (len(s) == 0 ? seq[any]{} :
       toSeq(s[:len(s) - 1]) ++ seq[any]{s[len(s) - 1]})
@@ -139,6 +144,7 @@ requires acc(x.Mem(elems), ReadPerm)
 ensures  acc(x.Mem(elems), ReadPerm)
 ensures  unfolding acc(x.Mem(elems), ReadPerm) in res == len(elems)
 ensures  res >= 0
+decreases
 func (x IntSlice) Len(ghost elems seq[any]) (res int) {
 	return len(x)
 }
@@ -157,6 +163,7 @@ requires 0 <= i && i < len(elems)
 requires 0 <= j && j < len(elems)
 ensures  acc(x.Mem(elems), ReadPerm)
 ensures  res == x.less_spec(i, j, elems)
+decreases
 func (x IntSlice) Less(i, j int, ghost elems seq[any]) (res bool) {
 	return unfolding acc(x.Mem(elems), ReadPerm) in x[i] < x[j]
 }
@@ -177,6 +184,7 @@ ensures  elems[j] === swapped_elems[i]
 ensures  forall idx int :: (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (elems[idx] === swapped_elems[idx]) //# find triggers
 ensures  haveSameElements(elems, swapped_elems)
 ensures  old(x.less_spec(i, j, elems)) ==> !x.less_spec(i, j, swapped_elems)
+decreases
 func (x IntSlice) Swap(i, j int, ghost elems seq[any]) (ghost swapped_elems seq[any]) {
 	unfold x.Mem(elems)
 	x[i], x[j] = x[j], x[i]
@@ -192,7 +200,7 @@ func (x IntSlice) Swap(i, j int, ghost elems seq[any]) (ghost swapped_elems seq[
 }
 
 //# implementation proof
-//(IntSlice) implements Interface{ }
+(IntSlice) implements Interface{ }
 
 
 
@@ -206,6 +214,7 @@ ensures  data.Mem(sorted_elems)
 ensures  haveSameElements(elems, sorted_elems)
 ensures  a == b ==> isPartiallySorted(data, a, a, sorted_elems)
 //ensures  isPartiallySorted(data, a, b - 1, sorted_elems)
+decreases
 func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted_elems seq[any]) {
 	sorted_elems = elems
 	assert data.Mem(sorted_elems)
