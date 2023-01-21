@@ -8,7 +8,7 @@
 // +gobra
 package sort
 
-//import "math/bits" //# Had to comment this out, otherwise verification progress does not go above 3%
+//# import "math/bits" //# Had to comment this out for verification to work.
 
 ghost const ReadPerm perm = 1/2
 
@@ -28,7 +28,7 @@ type Interface interface {
 	// must sort before the element with index j.
 	//
 	// If both Less(i, j) and Less(j, i) are false,
-	// then the elements at index i and j are considered equal. //# What does "considered equal mean"? We cannot use == in the spec since equality is relative to the defined order
+	// then the elements at index i and j are considered equal.
 	// Sort may place equal elements in any order in the final result,
 	// while Stable preserves the original input order of equal elements.
 	//
@@ -38,7 +38,7 @@ type Interface interface {
 	requires Mem(elems)
 	requires 0 <= i && i < len(elems)
 	requires 0 <= j && j < len(elems)
-	ensures  forall a, b, c int :: (0 <= a && a < len(elems) && 0 <= b && b < len(elems) && 0 <= c && c < len(elems) && less_spec(a,b,elems) && less_spec(b,c,elems)) ==> less_spec(a,c,elems)
+	ensures  forall a, b, c int :: {less_spec(a, b, elems), less_spec(b, c, elems)} (0 <= a && a < len(elems) && 0 <= b && b < len(elems) && 0 <= c && c < len(elems) && less_spec(a, b, elems) && less_spec(b, c, elems)) ==> less_spec(a, c, elems)
 	pure less_spec(i, j int, ghost elems seq[any]) (res bool)
 	//
 	// Note that floating-point comparison (the < operator on float32 or float64 values)
@@ -61,7 +61,7 @@ type Interface interface {
 	ensures  0 <= j && j < len(elems) && j < len(swapped_elems) //# possibly make Len() pure and use that
 	ensures  elems[i] === swapped_elems[j]
 	ensures  elems[j] === swapped_elems[i]
-	ensures  forall x int :: (0 <= x && x < len(elems) && x != i && x != j) ==> (elems[x] === swapped_elems[x])
+	ensures  forall x int :: (0 <= x && x < len(elems) && x != i && x != j) ==> (elems[x] === swapped_elems[x]) //# find triggers
 	ensures  haveSameElements(elems, swapped_elems)
 	ensures  old(less_spec(i, j, elems)) ==> !less_spec(i, j, swapped_elems) //# We make the effect of the Swap operation on the Less relation explicit.
 	Swap(i, j int, ghost elems seq[any]) (ghost swapped_elems seq[any])
@@ -78,7 +78,7 @@ requires start <= end && end < len(elems)
 ensures  end - start == 0 ==> res == true
 ensures  (end - start > 0 && !data.less_spec(end, end - 1, elems)) ==> res == isPartiallySorted(data, start, end - 1, elems)
 ensures  (end - start > 0 &&  data.less_spec(end, end - 1, elems)) ==> !res
-//ensures  res ==> (forall idx int :: ((start < idx && idx <= end) ==> !data.less_spec(idx, idx - 1, elems))) 
+//ensures  res ==> (forall idx int :: ((start < idx && idx <= end) ==> !data.less_spec(idx, idx - 1, elems))) //# find triggers
 //# The below line verifies and should just be an unrolled version of the above line in cases were start+2 < end. However, the above line does not verify.
 //ensures (res && start+2 < end) ==> !data.less_spec(end, end - 1, elems) && !data.less_spec(end-1, end - 2, elems) && !data.less_spec(end-2, end-3, elems)
 pure
@@ -89,8 +89,8 @@ func isPartiallySorted(data Interface, start, end int, ghost elems seq[any]) (re
 // IsSorted reports whether data is sorted.
 preserves data.Mem(elems)
 requires  data != nil
-ensures   res ==> forall idx int :: ((0 < idx && idx < len(elems)) ==> (!data.less_spec(idx, idx - 1, elems)))
-ensures   !res ==> !(forall idx int :: ((0 < idx && idx < len(elems)) ==> (!data.less_spec(idx, idx - 1, elems))))
+ensures   res ==> forall idx int :: {data.less_spec(idx, idx - 1, elems)} ((0 < idx && idx < len(elems)) ==> (!data.less_spec(idx, idx - 1, elems)))
+ensures   !res ==> !(forall idx int :: {data.less_spec(idx, idx - 1, elems)} ((0 < idx && idx < len(elems)) ==> (!data.less_spec(idx, idx - 1, elems))))
 func IsSorted(data Interface, ghost elems seq[any]) (res bool) {
 	n := data.Len(elems)
 
@@ -100,7 +100,7 @@ func IsSorted(data Interface, ghost elems seq[any]) (res bool) {
 	invariant i < n
 	invariant len(elems) > 0 ==> 0 <= i //# if n==0 then i==-1 after initialization
 	invariant data.Mem(elems)
-	invariant len(elems) != 0 ==> (forall idx int :: ((i < idx && idx < len(elems)) ==> !data.less_spec(idx, idx - 1, elems)))
+	invariant len(elems) != 0 ==> (forall idx int :: {data.less_spec(idx, idx - 1, elems)} ((i < idx && idx < len(elems)) ==> !data.less_spec(idx, idx - 1, elems)))
 	//invariant len(elems) != 0 ==> isPartiallySorted(data, i, n - 1, elems) //# Would like for this to hold here
 	decreases i
 	for i := n - 1; i > 0; i-- {
@@ -120,7 +120,7 @@ type IntSlice []int
 
 //# Adapted from Gobra tutorial
 ghost
-requires forall j int :: 0 <= j && j < len(s) ==> acc(&s[j], _)
+requires forall j int :: 0 <= j && j < len(s) ==> acc(&s[j], _) //# find triggers
 ensures len(res) == len(s)
 ensures forall j int :: {s[j]} {res[j]} 0 <= j && j < len(s) ==> s[j] == res[j]
 pure func toSeq(s []int) (res seq[any]) {
@@ -130,7 +130,7 @@ pure func toSeq(s []int) (res seq[any]) {
 
 pred (x IntSlice) Mem(ghost s seq[any]){
 	len(x) == len(s) && //# If this is not the first line in the predicate, then we cannot verify e.g. the last postcondition in Len()
-	forall j int :: 0 <= j && j < len(x) ==> acc(&x[j]) &&
+	forall j int :: 0 <= j && j < len(x) ==> acc(&x[j]) && //# find triggers
 	s == toSeq(x) &&
 	forall j int :: {x[j]} {s[j]} 0 <= j && j < len(s) ==> x[j] == s[j]
 }
@@ -146,7 +146,7 @@ func (x IntSlice) Len(ghost elems seq[any]) (res int) {
 requires x.Mem(elems)
 requires 0 <= i && i < len(elems)
 requires 0 <= j && j < len(elems)
-ensures  forall a, b, c int :: (0 <= a && a < len(elems) && 0 <= b && b < len(elems) && 0 <= c && c < len(elems) && x.less_spec(a,b,elems) && x.less_spec(b,c,elems)) ==> x.less_spec(a,c,elems)
+ensures  forall a, b, c int :: {x.less_spec(a, b, elems), x.less_spec(b, c, elems)} (0 <= a && a < len(elems) && 0 <= b && b < len(elems) && 0 <= c && c < len(elems) && x.less_spec(a, b, elems) && x.less_spec(b, c, elems)) ==> x.less_spec(a, c, elems)
 pure func (x IntSlice) less_spec(i, j int, ghost elems seq[any]) (res bool){
 	return unfolding x.Mem(elems) in x[i] < x[j]
 }
@@ -161,6 +161,7 @@ func (x IntSlice) Less(i, j int, ghost elems seq[any]) (res bool) {
 	return unfolding acc(x.Mem(elems), ReadPerm) in x[i] < x[j]
 }
 
+
 requires x.Mem(elems)
 requires 0 <= i && i < len(elems)
 requires 0 <= j && j < len(elems)
@@ -169,11 +170,11 @@ ensures  len(elems) == len(swapped_elems) //# Somehow this does not suffice to i
 ensures  0 <= i && i < len(elems) && i < len(swapped_elems)
 ensures  0 <= j && j < len(elems) && j < len(swapped_elems)
 //# This line is required..
-ensures  forall idx int :: (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (old(unfolding x.Mem(elems) in x[idx]) == (unfolding x.Mem(swapped_elems) in x[idx]))
+ensures  forall idx int :: (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (old(unfolding x.Mem(elems) in x[idx]) == (unfolding x.Mem(swapped_elems) in x[idx])) //# find triggers
 //# ..for these 3 corresponding lines to work.
 ensures  elems[i] === swapped_elems[j]
 ensures  elems[j] === swapped_elems[i]
-ensures  forall idx int :: (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (elems[idx] === swapped_elems[idx])
+ensures  forall idx int :: (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (elems[idx] === swapped_elems[idx]) //# find triggers
 ensures  haveSameElements(elems, swapped_elems)
 ensures  old(x.less_spec(i, j, elems)) ==> !x.less_spec(i, j, swapped_elems)
 func (x IntSlice) Swap(i, j int, ghost elems seq[any]) (ghost swapped_elems seq[any]) {
@@ -182,10 +183,16 @@ func (x IntSlice) Swap(i, j int, ghost elems seq[any]) (ghost swapped_elems seq[
 	swapped_elems = toSeq(x)
 	fold x.Mem(swapped_elems)
 	assume haveSameElements(elems, swapped_elems) //# We believe this to be true. I was not able to establish this as a fact and I was not able to map directly from IntSlice to mset[any].
+
+	//# These four following assumptions should not be required, it works without them in GobraIDE stable version as of Jan. 20th 2023.
+	assume forall idx int :: (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (old(unfolding x.Mem(elems) in x[idx]) == (unfolding x.Mem(swapped_elems) in x[idx]))
+	assume  elems[i] === swapped_elems[j]
+	assume  elems[j] === swapped_elems[i]
+	assume forall idx int :: (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (elems[idx] === swapped_elems[idx])
 }
 
 //# implementation proof
-(IntSlice) implements Interface{ }
+//(IntSlice) implements Interface{ }
 
 
 
@@ -208,7 +215,7 @@ func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted
 	invariant a < b ==> i <= b
 	invariant data.Mem(sorted_elems)
 	//# invariant prefix [a:i] is always sorted
-	//invariant forall idx int :: (a < idx && idx < i && i < b) ==> !data.less_spec(idx, idx - 1, sorted_elems) 
+	//invariant forall idx int :: (a < idx && idx < i && i < b) ==> !data.less_spec(idx, idx - 1, sorted_elems)  //# find triggers
 	//invariant isPartiallySorted(data, a, i - 1, sorted_elems)
 	decreases b-i
 	for i := a + 1; i < b; i++ { //# for any kind of sorting to happen b has to be at least a+2, does this mean if called with b=a+1 that this will not be sorted? Answer: YES, should we enforce that in the precondition?
@@ -218,7 +225,7 @@ func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted
 		invariant a < j ==> 0 <= j - 1
 		invariant data.Mem(sorted_elems)
 		//# invariant prefix [a:j-2] is always sorted and [j:i] is always sorted
-		//invariant forall idx int :: (j < idx && idx < i) ==> !data.less_spec(idx, idx - 1, sorted_elems) 
+		//invariant forall idx int :: (j < idx && idx < i) ==> !data.less_spec(idx, idx - 1, sorted_elems)  //# find triggers
 		//invariant isPartiallySorted(data, a, XXX, sorted_elems)
 		//invariant isPartiallySorted(data, YYY, i, sorted_elems)
 		decreases j-a
@@ -241,7 +248,7 @@ func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted
 //# helper:
 
 ghost
-ensures forall e any :: e in elemsSeq ==> e in elemsMultiSet
+ensures forall e any :: e in elemsSeq ==> e in elemsMultiSet //# find triggers
 ensures len(elemsSeq) == len(elemsMultiSet)
 pure func toMultiSet(ghost elemsSeq seq[any]) (ghost elemsMultiSet mset[any])
 
