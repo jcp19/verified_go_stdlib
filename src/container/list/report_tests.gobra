@@ -1,0 +1,82 @@
+package list
+
+//# This file contains the test cases shown in the report of the Practical Work project "Verifying Go's Standard Library"
+
+
+//# This is an adapted version of the example in https://github.com/golang/go/issues/50152
+trusted //# This should fail.
+func github_issue_50152() {
+	l := New()
+	assert l.Mem(set[*Element]{&l.root}, true)
+
+	el := l.PushBack(42, set[*Element]{&l.root}, true)
+	assert l.Mem(set[*Element]{&l.root, el}, true)
+
+	l = l.Init(set[*Element]{&l.root, el}, true) // Reset the list.
+	assert l.Mem(set[*Element]{&l.root}, true)
+
+	l.Remove(el, set[*Element]{&l.root})
+	//# Fails since (Element0 in elems) == (Element0.list == List0) does not hold.
+}
+
+//# This is an adapted version of the example provided in https://github.com/golang/go/issues/53351
+trusted //# This should fail.
+func github_issue53351() {
+    List0 := New()
+    assert List0.Mem(set[*Element]{&List0.root}, true)
+
+	Element0 := List0.PushBack(nil, set[*Element]{&List0.root}, true)
+	assert List0.Mem(set[*Element]{&List0.root, Element0}, true)
+	
+	List1 := List0.Init(set[*Element]{&List0.root, Element0}, true)
+	assert List0 == List1
+	assert List0.Mem(set[*Element]{&List1.root}, true)
+
+	Element1 := List1.PushBack(nil, set[*Element]{&List1.root}, true)
+	assert List0.Mem(set[*Element]{&List1.root, Element1}, true)
+	
+	List0.MoveAfter(Element0, Element1, set[*Element]{&List1.root, Element1})
+	//# Fails since (Element0 in elems) == (Element0.list == List0) does not hold.
+}
+
+// Test PushFront, PushBack, PushFrontList, PushBackList with uninitialized List
+func TestZeroList() {
+	var l1 = new(List)
+	fold l1.Mem(set[*Element]{&l1.root}, false)
+	e := l1.PushFront(1, set[*Element]{&l1.root}, false)
+	assert l1.Mem(set[*Element]{&l1.root, e}, true)
+	//...
+}
+
+// Test that a list l is not modified when calling InsertBefore with a mark that is not an element of l.
+func TestInsertBeforeUnknownMark() {
+	var l = new(List)
+	fold l.Mem(set[*Element]{&l.root}, false)
+	e1 := l.PushBack(1, set[*Element]{&l.root}, false)
+	e2 := l.PushBack(2, set[*Element]{&l.root, e1}, true)
+	e3 := l.PushBack(3, set[*Element]{&l.root, e1, e2}, true)
+	mark := new(Element)
+	assert unfolding l.Mem(set[*Element]{&l.root, e1, e2, e3}, true) in mark != &l.root
+	l.InsertBefore(1, mark, set[*Element]{&l.root, e1, e2, e3})
+	assert l.Mem(set[*Element]{&l.root, e1, e2, e3}, true)
+}
+
+
+func TestList() {
+	l := New()
+	//# ...
+	e2 := l.PushFront("2", set[*Element]{&l.root}, true)
+	assert l.root.comesBefore(e2, set[*Element]{&l.root, e2}, l)
+
+	e1 := l.PushFront(1, set[*Element]{&l.root, e2}, true)
+	assert l.root.comesBefore(e1, set[*Element]{&l.root, e1, e2}, l)
+
+	e3 := l.PushBack(3, set[*Element]{&l.root, e1, e2}, true)
+	assert e3.comesBefore(&l.root, set[*Element]{&l.root, e1, e2, e3}, l)
+
+	e4 := l.PushBack("banana", set[*Element]{&l.root, e1, e2, e3}, true)
+	assert e4.comesBefore(&l.root, set[*Element]{&l.root, e1, e2, e3, e4}, l)
+
+	l.Remove(e2, set[*Element]{&l.root, e1, e2, e3, e4})
+	assert l.Mem(set[*Element]{&l.root, e1, e3, e4}, true)
+}
