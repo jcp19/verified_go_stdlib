@@ -144,7 +144,7 @@ func (l *List) Back(/*@ ghost elems set[*Element] @*/) (res *Element) {
 func (l *List) lazyInit(/*@ ghost elems set[*Element], ghost isInit bool @*/) {
 	//@ unfold l.Mem(elems, isInit)
 	if l.root.next == nil {
-		//@ assert !isInit //# Here isInit==false is implied
+		//@ assert !isInit
 		//@ fold l.Mem(elems, isInit)
 		l.Init(/*@ elems, false @*/)
 	}
