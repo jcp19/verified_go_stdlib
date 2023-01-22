@@ -1,0 +1,60 @@
+// +gobra
+
+package list
+
+//# This constant serves as the permission amount used for partial read permissions throughout this package
+ghost const ReadPerm perm = 1/2
+
+ghost
+requires list.Mem(elems, true)
+requires e in elems
+ensures  res == (unfolding list.Mem(elems, true) in e.next)
+ensures  unfolding list.Mem(elems, true) in res in elems
+pure
+func (e *Element) nextPure(ghost elems set[*Element], ghost list *List) (res *Element) {
+	return unfolding list.Mem(elems, true) in e.next
+}
+
+ghost
+requires list.Mem(elems, true)
+requires e in elems
+ensures  res == (unfolding list.Mem(elems, true) in e.prev)
+ensures  unfolding list.Mem(elems, true) in res in elems
+pure
+func (e *Element) prevPure(ghost elems set[*Element], ghost list *List) (res *Element) {
+	return unfolding list.Mem(elems, true) in e.prev
+}
+
+ghost
+requires l.Mem(elems, true)
+requires e1 in elems && e2 in elems
+ensures  unfolding l.Mem(elems, true) in (e1.next == e2 && e2.prev == e1) == res
+pure
+func (e1 *Element) comesBefore(e2 *Element, ghost elems set[*Element], ghost l *List) (res bool) {
+	return unfolding l.Mem(elems, true) in (e1.next == e2 && e2.prev == e1)
+}
+
+//# This predicate abstracts over the permissions and consistency guarantees of a list l and its contained elements.
+//# Holding this predicate gives permissions to the underlying list l and the fields of all its elements.
+//# If a list went through its 'Init' method it is considered initialized (isInit==true) and fulfills some consistency guarantees.
+//# E.g. none of the elements' relevant fields are nil, the list is doubly-linked, the lenT field of the list is couples to the number of elements etc.
+//# Propely implemented methods receiving a consistent list should preserve the consistency.
+//# param s			s is the set of elements contained in the list. For an uninitialized or empty list it only contains &l.root
+//# param isInit	isInit specifies whether the list can be considered initialized and fulfilling its consistency guarantees
+pred (l *List) Mem(ghost s set[*Element], ghost isInit bool) {
+	acc(&l.lenT) &&
+	&l.root in s &&
+	l.lenT == len(s)-1 &&
+	(forall i *Element :: {i in s} i in s ==> (acc(&i.next) && acc(&i.prev) && acc(&i.list) && acc(&i.Value))) &&
+	((l.root.next == nil || l.root.prev == nil) ==> !isInit) &&
+	(!isInit ==> (
+		len(s) == 1 &&
+		s == set[*Element]{&l.root} && 
+		l.root.next == nil && 
+		l.root.prev == nil)) &&
+	(isInit ==> (
+		len(s) >= 1 &&
+		(forall i *Element :: {i in s} i in s ==> (i.next != nil && i.prev != nil && (i != &l.root ==> i.list == l))) &&
+		(forall i, j *Element :: {i in s, j.prev.next} {i.next, j in s} (i in s && i.next == j) ==> (j in s && j.prev == i && i.next.prev == i && j.prev.next == j)) &&
+		(forall i, j *Element :: {i, j.prev} {j, i.next} {i in s, j in s} (i in s && i.prev == j) ==> (j in s && j.next == i && i.prev.next == i && j.next.prev == j)) ))
+}
