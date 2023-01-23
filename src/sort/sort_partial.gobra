@@ -55,16 +55,15 @@ type Interface interface {
 
 	// Swap swaps the elements with indexes i and j.
 	requires Mem(elems)
-	requires 0 <= i && i < len(elems) //# possibly make Len() pure and use that
-	requires 0 <= j && j < len(elems) //# possibly make Len() pure and use that
+	requires 0 <= i && i < len(elems)
+	requires 0 <= j && j < len(elems)
 	ensures  Mem(swapped_elems)
-	ensures  len(elems) == len(swapped_elems) //# somehow this does not suffice to infer i and j are in range [0, len(swapped_elems)-1]
-	ensures  0 <= i && i < len(elems) && i < len(swapped_elems) //# possibly make Len() pure and use that
-	ensures  0 <= j && j < len(elems) && j < len(swapped_elems) //# possibly make Len() pure and use that
+	ensures  haveSameElements(elems, swapped_elems)
+	ensures  0 <= i && i < len(elems)
+	ensures  0 <= j && j < len(elems)
 	ensures  elems[i] === swapped_elems[j]
 	ensures  elems[j] === swapped_elems[i]
 	ensures  forall x int :: (0 <= x && x < len(elems) && x != i && x != j) ==> (elems[x] === swapped_elems[x]) //# find triggers
-	ensures  haveSameElements(elems, swapped_elems)
 	ensures  old(less_spec(i, j, elems)) ==> !less_spec(i, j, swapped_elems) //# We make the effect of the Swap operation on the Less relation explicit.
 	decreases
 	Swap(i, j int, ghost elems seq[any]) (ghost swapped_elems seq[any])
@@ -173,13 +172,12 @@ requires x.Mem(elems)
 requires 0 <= i && i < len(elems)
 requires 0 <= j && j < len(elems)
 ensures  x.Mem(swapped_elems)
-ensures  len(elems) == len(swapped_elems) //# Somehow this does not suffice to infer i and j are in range [0, len(swapped_elems)-1] and it needs to be stated explicitly below.
-ensures  0 <= i && i < len(elems) && i < len(swapped_elems)
-ensures  0 <= j && j < len(elems) && j < len(swapped_elems)
+ensures  haveSameElements(elems, swapped_elems)
+ensures  0 <= i && i < len(elems)
+ensures  0 <= j && j < len(elems)
 ensures  elems[i] === swapped_elems[j]
 ensures  elems[j] === swapped_elems[i]
 ensures  forall idx int :: (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (elems[idx] === swapped_elems[idx]) //# find triggers
-ensures  haveSameElements(elems, swapped_elems)
 ensures  old(x.less_spec(i, j, elems)) ==> !x.less_spec(i, j, swapped_elems)
 decreases
 func (x IntSlice) Swap(i, j int, ghost elems seq[any]) (ghost swapped_elems seq[any]) {
