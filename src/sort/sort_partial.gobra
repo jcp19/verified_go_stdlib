@@ -126,7 +126,7 @@ type IntSlice []int
 ghost
 requires forall j int :: 0 <= j && j < len(s) ==> acc(&s[j], _) //# find triggers
 ensures len(res) == len(s)
-ensures forall j int :: {s[j]} {res[j]} 0 <= j && j < len(s) ==> s[j] == res[j]
+ensures forall j int :: {&s[j]} {res[j]} 0 <= j && j < len(s) ==> s[j] == res[j]
 decreases len(s)
 pure func toSeq(s []int) (res seq[any]) {
   return (len(s) == 0 ? seq[any]{} :
@@ -137,7 +137,7 @@ pred (x IntSlice) Mem(ghost s seq[any]){
 	len(x) == len(s) && //# If this is not the first line in the predicate, then we cannot verify e.g. the last postcondition in Len()
 	forall j int :: 0 <= j && j < len(x) ==> acc(&x[j]) && //# find triggers
 	s == toSeq(x) &&
-	forall j int :: {x[j]} {s[j]} 0 <= j && j < len(s) ==> x[j] == s[j]
+	forall j int :: {&x[j]} {s[j]} 0 <= j && j < len(s) ==> x[j] == s[j]
 }
 
 requires acc(x.Mem(elems), ReadPerm)
@@ -176,9 +176,6 @@ ensures  x.Mem(swapped_elems)
 ensures  len(elems) == len(swapped_elems) //# Somehow this does not suffice to infer i and j are in range [0, len(swapped_elems)-1] and it needs to be stated explicitly below.
 ensures  0 <= i && i < len(elems) && i < len(swapped_elems)
 ensures  0 <= j && j < len(elems) && j < len(swapped_elems)
-//# This line is required..
-ensures  forall idx int :: (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (old(unfolding x.Mem(elems) in x[idx]) == (unfolding x.Mem(swapped_elems) in x[idx])) //# find triggers
-//# ..for these 3 corresponding lines to work.
 ensures  elems[i] === swapped_elems[j]
 ensures  elems[j] === swapped_elems[i]
 ensures  forall idx int :: (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (elems[idx] === swapped_elems[idx]) //# find triggers
@@ -190,13 +187,9 @@ func (x IntSlice) Swap(i, j int, ghost elems seq[any]) (ghost swapped_elems seq[
 	x[i], x[j] = x[j], x[i]
 	swapped_elems = toSeq(x)
 	fold x.Mem(swapped_elems)
-	assume haveSameElements(elems, swapped_elems) //# We believe this to be true. I was not able to establish this as a fact and I was not able to map directly from IntSlice to mset[any].
-
-	//# These four following assumptions should not be required, it works without them in GobraIDE stable version as of Jan. 20th 2023.
-	assume forall idx int :: (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (old(unfolding x.Mem(elems) in x[idx]) == (unfolding x.Mem(swapped_elems) in x[idx]))
-	assume  elems[i] === swapped_elems[j]
-	assume  elems[j] === swapped_elems[i]
-	assume forall idx int :: (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (elems[idx] === swapped_elems[idx])
+	assume forall idx int :: (0 <= idx && idx < len(elems)) ==> elems[idx] == old(unfolding x.Mem(elems) in  x[idx]) //# Cannot be asserted in GobraCLI but works in GobraIDE as of Jan 23rd 2023
+	assert forall idx int :: (0 <= idx && idx < len(swapped_elems)) ==> swapped_elems[idx] == unfolding x.Mem(swapped_elems) in  x[idx]
+	assume haveSameElements(elems, swapped_elems) //# We believe this to be true.
 }
 
 //# implementation proof
@@ -212,7 +205,7 @@ requires 0 <= a && a < len(elems)
 requires a <= b && b <= len(elems) //# the element at position b does not get sorted
 ensures  data.Mem(sorted_elems)
 ensures  haveSameElements(elems, sorted_elems)
-ensures  a == b ==> isPartiallySorted(data, a, a, sorted_elems)
+//ensures  a == b ==> isPartiallySorted(data, a, a, sorted_elems)
 //ensures  isPartiallySorted(data, a, b - 1, sorted_elems)
 decreases
 func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted_elems seq[any]) {
@@ -224,7 +217,7 @@ func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted
 	invariant a < b ==> i <= b
 	invariant data.Mem(sorted_elems)
 	//# invariant prefix [a:i] is always sorted
-	//invariant forall idx int :: (a < idx && idx < i && i < b) ==> !data.less_spec(idx, idx - 1, sorted_elems)  //# find triggers
+	//invariant forall idx int :: (a < idx && idx < i) ==> !data.less_spec(idx, idx - 1, sorted_elems)  //# find triggers
 	//invariant isPartiallySorted(data, a, i - 1, sorted_elems)
 	decreases b-i
 	for i := a + 1; i < b; i++ { //# for any kind of sorting to happen b has to be at least a+2, does this mean if called with b=a+1 that this will not be sorted? Answer: YES, should we enforce that in the precondition?
@@ -233,8 +226,9 @@ func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted
 		invariant a <= j && j <= i
 		invariant a < j ==> 0 <= j - 1
 		invariant data.Mem(sorted_elems)
-		//# invariant prefix [a:j-2] is always sorted and [j:i] is always sorted
-		//invariant forall idx int :: (j < idx && idx < i) ==> !data.less_spec(idx, idx - 1, sorted_elems)  //# find triggers
+		//# invariant prefix [a:j-1] is always sorted and [j:i] is always sorted
+		//invariant (j <= a || !data.less_spec(j, j - 1, sorted_elems)) ==> (forall idx int :: (a < idx && idx < i) ==> !data.less_spec(idx, idx - 1, sorted_elems))
+		//invariant (j > a && data.less_spec(j, j - 1, sorted_elems)) ==> (forall idx int :: (a < idx && idx < i && idx != j) ==> !data.less_spec(idx, idx - 1, sorted_elems))  //# find triggers
 		//invariant isPartiallySorted(data, a, XXX, sorted_elems)
 		//invariant isPartiallySorted(data, YYY, i, sorted_elems)
 		decreases j-a
