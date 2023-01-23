@@ -36,10 +36,16 @@ type Interface interface {
 	// Less must describe a transitive ordering:
 	//  - if both Less(i, j) and Less(j, k) are true, then Less(i, k) must be true as well.
 	//  - if both Less(i, j) and Less(j, k) are false, then Less(i, k) must be false as well.
-	requires Mem(elems)
+	ghost
+	preserves acc(Mem(elems), _)
+	ensures  forall a, b, c int :: {less_spec(a, b, elems), less_spec(b, c, elems)} (0 <= a && a < len(elems) && 0 <= b && b < len(elems) && 0 <= c && c < len(elems) && less_spec(a, b, elems) && less_spec(b, c, elems)) ==> less_spec(a, c, elems)
+	decreases
+	LemmaLessIsTransitive(ghost elems seq[any])
+
+	requires acc(Mem(elems), ReadPerm)
 	requires 0 <= i && i < len(elems)
 	requires 0 <= j && j < len(elems)
-	ensures  forall a, b, c int :: {less_spec(a, b, elems), less_spec(b, c, elems)} (0 <= a && a < len(elems) && 0 <= b && b < len(elems) && 0 <= c && c < len(elems) && less_spec(a, b, elems) && less_spec(b, c, elems)) ==> less_spec(a, c, elems)
+	decreases
 	pure less_spec(i, j int, ghost elems seq[any]) (res bool)
 	//
 	// Note that floating-point comparison (the < operator on float32 or float64 values)
@@ -71,21 +77,20 @@ type Interface interface {
 
 
 //# PLACEHOLDER: Here would be more code from the original sort.go file.
-
+//# isPartiallySorted is intended to be used in specifications.
+//# It reports whether the elemented from indicies 'start' to 'end' (inclusive) are sorted in non-decreasing order according to 'less_spec'
 ghost
 requires data != nil
 requires data.Mem(elems)
 requires 0 <= start && start < len(elems)
 requires start <= end && end < len(elems)
-ensures  end - start == 0 ==> res == true
-ensures  (end - start > 0 && !data.less_spec(end, end - 1, elems)) ==> res == isPartiallySorted(data, start, end - 1, elems)
-ensures  (end - start > 0 &&  data.less_spec(end, end - 1, elems)) ==> !res
-//ensures  res ==> (forall idx int :: ((start < idx && idx <= end) ==> !data.less_spec(idx, idx - 1, elems))) //# find triggers
-//# The below line verifies and should just be an unrolled version of the above line in cases were start+2 < end. However, the above line does not verify.
-//ensures (res && start+2 < end) ==> !data.less_spec(end, end - 1, elems) && !data.less_spec(end-1, end - 2, elems) && !data.less_spec(end-2, end-3, elems)
+ensures  end == start ==> sorted
+ensures  (end > start && !data.less_spec(end, end - 1, elems)) ==> sorted == isPartiallySorted(data, start, end - 1, elems)
+ensures  (end > start &&  data.less_spec(end, end - 1, elems)) ==> !sorted
+decreases end - start
 pure
-func isPartiallySorted(data Interface, start, end int, ghost elems seq[any]) (res bool) {
-	return (end - start == 0) ? true : (!data.less_spec(end, end - 1, elems) ? isPartiallySorted(data, start, end - 1, elems) : false)
+func isPartiallySorted(data Interface, start, end int, ghost elems seq[any]) (sorted bool) {
+	return (end == start) ? true : (!data.less_spec(end, end - 1, elems) ? isPartiallySorted(data, start, end - 1, elems) : false)
 }
 
 // IsSorted reports whether data is sorted.
@@ -103,14 +108,13 @@ func IsSorted(data Interface, ghost elems seq[any]) (res bool) {
 	invariant i < n
 	invariant len(elems) > 0 ==> 0 <= i //# if n==0 then i==-1 after initialization
 	invariant data.Mem(elems)
-	invariant len(elems) != 0 ==> (forall idx int :: {data.less_spec(idx, idx - 1, elems)} ((i < idx && idx < len(elems)) ==> !data.less_spec(idx, idx - 1, elems)))
-	//invariant len(elems) != 0 ==> isPartiallySorted(data, i, n - 1, elems) //# Would like for this to hold here
+	invariant len(elems) > 0 ==> (forall idx int :: {data.less_spec(idx, idx - 1, elems)} ((i < idx && idx < len(elems)) ==> !data.less_spec(idx, idx - 1, elems)))
 	decreases i
 	for i := n - 1; i > 0; i-- {
 		if data.Less(i, i - 1, elems) {
 			return false
 		}
-		//assert isPartiallySorted(data, i, n - 1, elems)
+		assert !data.less_spec(i, i - 1, elems)
 	}
 	assert res
 	return
@@ -148,14 +152,21 @@ func (x IntSlice) Len(ghost elems seq[any]) (res int) {
 	return len(x)
 }
 
-requires x.Mem(elems)
-requires 0 <= i && i < len(elems)
-requires 0 <= j && j < len(elems)
+ghost
+preserves acc(x.Mem(elems), _)
 ensures  forall a, b, c int :: {x.less_spec(a, b, elems), x.less_spec(b, c, elems)} (0 <= a && a < len(elems) && 0 <= b && b < len(elems) && 0 <= c && c < len(elems) && x.less_spec(a, b, elems) && x.less_spec(b, c, elems)) ==> x.less_spec(a, c, elems)
-pure func (x IntSlice) less_spec(i, j int, ghost elems seq[any]) (res bool){
-	return unfolding x.Mem(elems) in x[i] < x[j]
+decreases
+func (x IntSlice) LemmaLessIsTransitive(ghost elems seq[any]){
+	unfold acc(x.Mem(elems), _)
 }
 
+requires acc(x.Mem(elems), ReadPerm)
+requires 0 <= i && i < len(elems)
+requires 0 <= j && j < len(elems)
+decreases
+pure func (x IntSlice) less_spec(i, j int, ghost elems seq[any]) (res bool){
+	return unfolding acc(x.Mem(elems), ReadPerm) in x[i] < x[j]
+}
 
 requires acc(x.Mem(elems), ReadPerm)
 requires 0 <= i && i < len(elems)
@@ -177,7 +188,7 @@ ensures  0 <= i && i < len(elems)
 ensures  0 <= j && j < len(elems)
 ensures  elems[i] === swapped_elems[j]
 ensures  elems[j] === swapped_elems[i]
-ensures  forall idx int :: (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (elems[idx] === swapped_elems[idx]) //# find triggers
+ensures  forall idx int :: {elems[idx]} {swapped_elems[idx]} (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (elems[idx] === swapped_elems[idx])
 ensures  old(x.less_spec(i, j, elems)) ==> !x.less_spec(i, j, swapped_elems)
 decreases
 func (x IntSlice) Swap(i, j int, ghost elems seq[any]) (ghost swapped_elems seq[any]) {
