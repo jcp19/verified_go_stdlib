@@ -18,10 +18,8 @@ type Interface interface {
 	pred Mem(ghost s seq[any])
 
 	// Len is the number of elements in the collection.
-	requires acc(Mem(elems), ReadPerm)
-	ensures  acc(Mem(elems), ReadPerm)
+	preserves acc(Mem(elems), ReadPerm)
 	ensures  res == len(elems)
-	ensures  res >= 0
 	decreases
 	Len(ghost elems seq[any]) (res int)
 
@@ -38,7 +36,7 @@ type Interface interface {
 	//  - if both Less(i, j) and Less(j, k) are false, then Less(i, k) must be false as well.
 	ghost
 	preserves acc(Mem(elems), _)
-	ensures  forall a, b, c int :: {less_spec(a, b, elems), less_spec(b, c, elems)} (0 <= a && a < len(elems) && 0 <= b && b < len(elems) && 0 <= c && c < len(elems) && less_spec(a, b, elems) && less_spec(b, c, elems)) ==> less_spec(a, c, elems)
+	ensures   forall a, b, c int :: {less_spec(a, b, elems), less_spec(b, c, elems)} (0 <= a && a < len(elems) && 0 <= b && b < len(elems) && 0 <= c && c < len(elems) && less_spec(a, b, elems) && less_spec(b, c, elems)) ==> less_spec(a, c, elems)
 	decreases
 	LemmaLessIsTransitive(ghost elems seq[any])
 
@@ -52,11 +50,10 @@ type Interface interface {
 	// Note that floating-point comparison (the < operator on float32 or float64 values)
 	// is not a transitive ordering when not-a-number (NaN) values are involved.
 	// See Float64Slice.Less for a correct implementation for floating-point values.
-	requires acc(Mem(elems), ReadPerm)
-	requires 0 <= i && i < len(elems)
-	requires 0 <= j && j < len(elems)
-	ensures  acc(Mem(elems), ReadPerm)
-	ensures  res == less_spec(i, j, elems)
+	preserves acc(Mem(elems), ReadPerm)
+	requires  0 <= i && i < len(elems)
+	requires  0 <= j && j < len(elems)
+	ensures   res == less_spec(i, j, elems)
 	decreases
 	Less(i, j int, ghost elems seq[any]) (res bool)
 
@@ -144,10 +141,8 @@ pred (x IntSlice) Mem(ghost s seq[any]){
 	forall j int :: {&x[j]} {s[j]} 0 <= j && j < len(s) ==> x[j] == s[j]
 }
 
-requires acc(x.Mem(elems), ReadPerm)
-ensures  acc(x.Mem(elems), ReadPerm)
-ensures  unfolding acc(x.Mem(elems), ReadPerm) in res == len(elems)
-ensures  res >= 0
+preserves acc(x.Mem(elems), ReadPerm)
+ensures   unfolding acc(x.Mem(elems), ReadPerm) in res == len(elems)
 decreases
 func (x IntSlice) Len(ghost elems seq[any]) (res int) {
 	return len(x)
@@ -155,7 +150,7 @@ func (x IntSlice) Len(ghost elems seq[any]) (res int) {
 
 ghost
 preserves acc(x.Mem(elems), _)
-ensures  forall a, b, c int :: {x.less_spec(a, b, elems), x.less_spec(b, c, elems)} (0 <= a && a < len(elems) && 0 <= b && b < len(elems) && 0 <= c && c < len(elems) && x.less_spec(a, b, elems) && x.less_spec(b, c, elems)) ==> x.less_spec(a, c, elems)
+ensures   forall a, b, c int :: {x.less_spec(a, b, elems), x.less_spec(b, c, elems)} (0 <= a && a < len(elems) && 0 <= b && b < len(elems) && 0 <= c && c < len(elems) && x.less_spec(a, b, elems) && x.less_spec(b, c, elems)) ==> x.less_spec(a, c, elems)
 decreases
 func (x IntSlice) LemmaLessIsTransitive(ghost elems seq[any]){
 	unfold acc(x.Mem(elems), _)
@@ -170,11 +165,10 @@ pure func (x IntSlice) less_spec(i, j int, ghost elems seq[any]) (res bool){
 	return unfolding acc(x.Mem(elems), ReadPerm) in x[i] < x[j]
 }
 
-requires acc(x.Mem(elems), ReadPerm)
-requires 0 <= i && i < len(elems)
-requires 0 <= j && j < len(elems)
-ensures  acc(x.Mem(elems), ReadPerm)
-ensures  res == x.less_spec(i, j, elems)
+preserves acc(x.Mem(elems), ReadPerm)
+requires  0 <= i && i < len(elems)
+requires  0 <= j && j < len(elems)
+ensures   res == x.less_spec(i, j, elems)
 decreases
 func (x IntSlice) Less(i, j int, ghost elems seq[any]) (res bool) {
 	return unfolding acc(x.Mem(elems), ReadPerm) in x[i] < x[j]
@@ -226,8 +220,8 @@ func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted
 	invariant a < b ==> i <= b
 	invariant data.Mem(sorted_elems)
 	//# invariant prefix [a:i] is always sorted
-	//invariant i < b ==> (forall idx int :: (a < idx && idx < i) ==> !data.less_spec(idx, idx - 1, sorted_elems))  //# find triggers
-	invariant i < b ==> (forall idx1, idx2 int :: (0 <= idx1 && idx1 <= idx2 && idx2 < i) ==> !data.less_spec(idx2, idx1, sorted_elems))
+	//invariant i < b ==> (forall idx int :: (a < idx && idx < i) ==> !data.less_spec(idx, idx - 1, sorted_elems))  //# neighbors are ordered
+	//invariant i < b ==> (forall idx1, idx2 int :: (0 <= idx1 && idx1 <= idx2 && idx2 < i) ==> !data.less_spec(idx2, idx1, sorted_elems))
 	decreases b-i
 	for i := a + 1; i < b; i++ {
 		invariant haveSameElements(elems, sorted_elems)
@@ -263,7 +257,11 @@ func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted
 ghost
 ensures forall e any :: e in elemsSeq ==> e in elemsMultiSet //# find triggers
 ensures len(elemsSeq) == len(elemsMultiSet)
-pure func toMultiSet(ghost elemsSeq seq[any]) (ghost elemsMultiSet mset[any])
+pure func toMultiSet(ghost elemsSeq seq[any]) (ghost elemsMultiSet mset[any]){
+	return (len(elemsSeq) == 0 ? mset[any]{} : 
+		mset[any]{elemsSeq[len(elemsSeq) - 1]} union toMultiSet(elemsSeq[:len(elemsSeq) - 1]))
+}
+
 
 
 
