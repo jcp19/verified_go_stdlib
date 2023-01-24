@@ -45,6 +45,7 @@ type Interface interface {
 	requires acc(Mem(elems), ReadPerm)
 	requires 0 <= i && i < len(elems)
 	requires 0 <= j && j < len(elems)
+	ensures  i == j ==> !res
 	decreases
 	pure less_spec(i, j int, ghost elems seq[any]) (res bool)
 	//
@@ -163,6 +164,7 @@ func (x IntSlice) LemmaLessIsTransitive(ghost elems seq[any]){
 requires acc(x.Mem(elems), ReadPerm)
 requires 0 <= i && i < len(elems)
 requires 0 <= j && j < len(elems)
+ensures  i == j ==> !res
 decreases
 pure func (x IntSlice) less_spec(i, j int, ghost elems seq[any]) (res bool){
 	return unfolding acc(x.Mem(elems), ReadPerm) in x[i] < x[j]
@@ -214,8 +216,6 @@ requires 0 <= a && a < len(elems)
 requires a <= b && b <= len(elems) //# the element at position b does not get sorted
 ensures  data.Mem(sorted_elems)
 ensures  haveSameElements(elems, sorted_elems)
-//ensures  a == b ==> isPartiallySorted(data, a, a, sorted_elems)
-//ensures  isPartiallySorted(data, a, b - 1, sorted_elems)
 decreases
 func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted_elems seq[any]) {
 	sorted_elems = elems
@@ -226,10 +226,10 @@ func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted
 	invariant a < b ==> i <= b
 	invariant data.Mem(sorted_elems)
 	//# invariant prefix [a:i] is always sorted
-	//invariant forall idx int :: (a < idx && idx < i) ==> !data.less_spec(idx, idx - 1, sorted_elems)  //# find triggers
-	//invariant isPartiallySorted(data, a, i - 1, sorted_elems)
+	//invariant i < b ==> (forall idx int :: (a < idx && idx < i) ==> !data.less_spec(idx, idx - 1, sorted_elems))  //# find triggers
+	invariant i < b ==> (forall idx1, idx2 int :: (0 <= idx1 && idx1 <= idx2 && idx2 < i) ==> !data.less_spec(idx2, idx1, sorted_elems))
 	decreases b-i
-	for i := a + 1; i < b; i++ { //# for any kind of sorting to happen b has to be at least a+2, does this mean if called with b=a+1 that this will not be sorted? Answer: YES, should we enforce that in the precondition?
+	for i := a + 1; i < b; i++ {
 		invariant haveSameElements(elems, sorted_elems)
 		invariant i < b
 		invariant a <= j && j <= i
@@ -237,9 +237,9 @@ func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted
 		invariant data.Mem(sorted_elems)
 		//# invariant prefix [a:j-1] is always sorted and [j:i] is always sorted
 		//invariant (j <= a || !data.less_spec(j, j - 1, sorted_elems)) ==> (forall idx int :: (a < idx && idx < i) ==> !data.less_spec(idx, idx - 1, sorted_elems))
-		//invariant (j > a && data.less_spec(j, j - 1, sorted_elems)) ==> (forall idx int :: (a < idx && idx < i && idx != j) ==> !data.less_spec(idx, idx - 1, sorted_elems))  //# find triggers
-		//invariant isPartiallySorted(data, a, XXX, sorted_elems)
-		//invariant isPartiallySorted(data, YYY, i, sorted_elems)
+		//invariant i < b ==> ((j > a && data.less_spec(j, j - 1, sorted_elems)) ==> (forall idx int :: (a < idx && idx < i && idx != j) ==> !data.less_spec(idx, idx - 1, sorted_elems)) ) //# find triggers
+		//invariant i < b ==> (forall idx1, idx2 int :: (0 <= idx1 && idx1 <= idx2 && idx2 < j) ==> !data.less_spec(idx2, idx1, sorted_elems))
+		//invariant i < b ==> (forall idx1, idx2 int :: (j < idx1 && idx1 <= idx2 && idx2 < i) ==> !data.less_spec(idx2, idx1, sorted_elems))
 		decreases j-a
 		for j := i; j > a /*&& data.Less(j, j - 1, elems)*/; j-- { //# The second conjunct in the loop condition was commented out. See comment below.
 			assert 0 <= j - 1
@@ -249,6 +249,7 @@ func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted
 				sorted_elems = data.Swap(j, j - 1, sorted_elems)
 				assert !data.less_spec(j, j - 1, sorted_elems)
 			} else {
+				assert !data.less_spec(j, j - 1, sorted_elems)
 				break
 			}
 		}
