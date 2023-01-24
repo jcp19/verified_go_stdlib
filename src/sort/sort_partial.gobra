@@ -137,8 +137,7 @@ pure func toSeq(s []int) (res seq[any]) {
 pred (x IntSlice) Mem(ghost s seq[any]){
 	len(x) == len(s) && //# If this is not the first line in the predicate, then we cannot verify e.g. the last postcondition in Len()
 	forall j int :: 0 <= j && j < len(x) ==> acc(&x[j]) && //# find triggers
-	s == toSeq(x) &&
-	forall j int :: {&x[j]} {s[j]} 0 <= j && j < len(s) ==> x[j] == s[j]
+	s == toSeq(x)
 }
 
 preserves acc(x.Mem(elems), ReadPerm)
