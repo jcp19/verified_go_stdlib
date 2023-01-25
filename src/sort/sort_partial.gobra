@@ -69,6 +69,7 @@ type Interface interface {
 	ensures  elems[j] === swapped_elems[i]
 	ensures  forall x int :: (0 <= x && x < len(elems) && x != i && x != j) ==> (elems[x] === swapped_elems[x]) //# find triggers
 	ensures  old(less_spec(i, j, elems)) ==> !less_spec(i, j, swapped_elems) //# We make the effect of the Swap operation on the Less relation explicit.
+	ensures  old(less_spec(j, i, elems)) ==> !less_spec(j, i, swapped_elems)
 	decreases
 	Swap(i, j int, ghost elems seq[any]) (ghost swapped_elems seq[any])
 }
@@ -185,6 +186,7 @@ ensures  elems[i] === swapped_elems[j]
 ensures  elems[j] === swapped_elems[i]
 ensures  forall idx int :: {elems[idx]} {swapped_elems[idx]} (0 <= idx && idx < len(elems) && idx != i && idx != j) ==> (elems[idx] === swapped_elems[idx])
 ensures  old(x.less_spec(i, j, elems)) ==> !x.less_spec(i, j, swapped_elems)
+ensures  old(x.less_spec(j, i, elems)) ==> !x.less_spec(j, i, swapped_elems)
 decreases
 func (x IntSlice) Swap(i, j int, ghost elems seq[any]) (ghost swapped_elems seq[any]) {
 	unfold x.Mem(elems)
@@ -219,8 +221,6 @@ func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted
 	invariant a < b ==> i <= b
 	invariant data.Mem(sorted_elems)
 	//# invariant prefix [a:i] is always sorted
-	//invariant i < b ==> (forall idx int :: (a < idx && idx < i) ==> !data.less_spec(idx, idx - 1, sorted_elems))  //# neighbors are ordered
-	//invariant i < b ==> (forall idx1, idx2 int :: (0 <= idx1 && idx1 <= idx2 && idx2 < i) ==> !data.less_spec(idx2, idx1, sorted_elems))
 	decreases b-i
 	for i := a + 1; i < b; i++ {
 		invariant haveSameElements(elems, sorted_elems)
@@ -229,10 +229,6 @@ func insertionSort(data Interface, a, b int, ghost elems seq[any]) (ghost sorted
 		invariant a < j ==> 0 <= j - 1
 		invariant data.Mem(sorted_elems)
 		//# invariant prefix [a:j-1] is always sorted and [j:i] is always sorted
-		//invariant (j <= a || !data.less_spec(j, j - 1, sorted_elems)) ==> (forall idx int :: (a < idx && idx < i) ==> !data.less_spec(idx, idx - 1, sorted_elems))
-		//invariant i < b ==> ((j > a && data.less_spec(j, j - 1, sorted_elems)) ==> (forall idx int :: (a < idx && idx < i && idx != j) ==> !data.less_spec(idx, idx - 1, sorted_elems)) ) //# find triggers
-		//invariant i < b ==> (forall idx1, idx2 int :: (0 <= idx1 && idx1 <= idx2 && idx2 < j) ==> !data.less_spec(idx2, idx1, sorted_elems))
-		//invariant i < b ==> (forall idx1, idx2 int :: (j < idx1 && idx1 <= idx2 && idx2 < i) ==> !data.less_spec(idx2, idx1, sorted_elems))
 		decreases j-a
 		for j := i; j > a /*&& data.Less(j, j - 1, elems)*/; j-- { //# The second conjunct in the loop condition was commented out. See comment below.
 			assert 0 <= j - 1
