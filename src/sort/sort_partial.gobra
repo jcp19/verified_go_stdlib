@@ -67,7 +67,7 @@ type Interface interface {
 	ensures  0 <= j && j < len(elems)
 	ensures  elems[i] === swapped_elems[j]
 	ensures  elems[j] === swapped_elems[i]
-	ensures  forall x int :: (0 <= x && x < len(elems) && x != i && x != j) ==> (elems[x] === swapped_elems[x]) //# find triggers
+	ensures  forall x int :: {elems[x]} {swapped_elems[x]} (0 <= x && x < len(elems) && x != i && x != j) ==> (elems[x] === swapped_elems[x])
 	ensures  old(less_spec(i, j, elems)) ==> !less_spec(i, j, swapped_elems) //# We make the effect of the Swap operation on the Less relation explicit.
 	ensures  old(less_spec(j, i, elems)) ==> !less_spec(j, i, swapped_elems)
 	decreases
@@ -126,7 +126,7 @@ type IntSlice []int
 
 //# Adapted from Gobra tutorial
 ghost
-requires forall j int :: 0 <= j && j < len(s) ==> acc(&s[j], _) //# find triggers
+requires forall j int :: {&s[j]} 0 <= j && j < len(s) ==> acc(&s[j], _)
 ensures len(res) == len(s)
 ensures forall j int :: {&s[j]} {res[j]} 0 <= j && j < len(s) ==> s[j] == res[j]
 decreases len(s)
@@ -137,7 +137,7 @@ pure func toSeq(s []int) (res seq[any]) {
 
 pred (x IntSlice) Mem(ghost s seq[any]){
 	len(x) == len(s) && //# If this is not the first line in the predicate, then we cannot verify e.g. the last postcondition in Len()
-	forall j int :: 0 <= j && j < len(x) ==> acc(&x[j]) && //# find triggers
+	forall j int :: {&x[j]} 0 <= j && j < len(x) ==> acc(&x[j]) &&
 	s == toSeq(x)
 }
 
