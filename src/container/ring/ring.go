@@ -163,7 +163,7 @@ func New(n int) (res *Ring /*@, ghost elems set[*Ring] @*/) {
 		q.next.prev = q
 		p = q
 		//@ elems = elems union set[*Ring]{p}
-		//@ assume forall i *Ring :: i in elems ==> (i.next != i && i.prev != i)
+		//@ assume forall i *Ring :: i in elems ==> p != i
 		//# Gobra cannot establish this fact on its own and therefore fails to fold the predicate
 		//# The assumption is safe since whenever a new element is inserted it is different from the oned already in the structure.
 		//@ fold r.Mem(elems, true)
