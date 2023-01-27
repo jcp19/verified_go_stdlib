@@ -35,8 +35,9 @@ type Interface interface {
 	//  - if both Less(i, j) and Less(j, k) are true, then Less(i, k) must be true as well.
 	//  - if both Less(i, j) and Less(j, k) are false, then Less(i, k) must be false as well.
 	ghost
-	preserves acc(Mem(elems), _)
+	preserves acc(Mem(elems), ReadPerm)
 	ensures   forall a, b, c int :: {less_spec(a, b, elems), less_spec(b, c, elems)} (0 <= a && a < len(elems) && 0 <= b && b < len(elems) && 0 <= c && c < len(elems) && less_spec(a, b, elems) && less_spec(b, c, elems)) ==> less_spec(a, c, elems)
+	ensures   forall a, b, c int :: {less_spec(a, b, elems), less_spec(b, c, elems)} (0 <= a && a < len(elems) && 0 <= b && b < len(elems) && 0 <= c && c < len(elems) && !less_spec(a, b, elems) && !less_spec(b, c, elems)) ==> !less_spec(a, c, elems)
 	decreases
 	LemmaLessIsTransitive(ghost elems seq[any])
 
@@ -149,11 +150,13 @@ func (x IntSlice) Len(ghost elems seq[any]) (res int) {
 }
 
 ghost
-preserves acc(x.Mem(elems), _)
+preserves acc(x.Mem(elems), ReadPerm)
 ensures   forall a, b, c int :: {x.less_spec(a, b, elems), x.less_spec(b, c, elems)} (0 <= a && a < len(elems) && 0 <= b && b < len(elems) && 0 <= c && c < len(elems) && x.less_spec(a, b, elems) && x.less_spec(b, c, elems)) ==> x.less_spec(a, c, elems)
+ensures   forall a, b, c int :: {x.less_spec(a, b, elems), x.less_spec(b, c, elems)} (0 <= a && a < len(elems) && 0 <= b && b < len(elems) && 0 <= c && c < len(elems) && !x.less_spec(a, b, elems) && !x.less_spec(b, c, elems)) ==> !x.less_spec(a, c, elems)
 decreases
 func (x IntSlice) LemmaLessIsTransitive(ghost elems seq[any]){
-	unfold acc(x.Mem(elems), _)
+	unfold acc(x.Mem(elems), ReadPerm)
+	fold acc(x.Mem(elems), ReadPerm)
 }
 
 requires acc(x.Mem(elems), ReadPerm)
