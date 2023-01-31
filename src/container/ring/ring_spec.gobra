@@ -22,7 +22,6 @@ pred (r *Ring) Mem(ghost s set[*Ring], ghost isInit bool) {
 	(!isInit ==> (s == set[*Ring]{r} && r.next == nil && r.prev == nil && len(s) == 1)) &&
 	(isInit ==> (
 		(forall i *Ring :: {i in s} i in s ==> (i.next != nil && i.prev != nil)) &&
-		(len(s) > 1 ==> (forall i *Ring :: {i in s} i in s ==> (i.next != i && i.prev != i))) && //# This line is necessary to establish the neighborhood relations when splitting the cases in 'Link'
 		(forall i, j *Ring :: ((i in s && i.next == j) ==> (j in s && j.prev == i && i.next.prev == i && j.prev.next == j))) &&
 		(forall i, j *Ring :: ((i in s && i.prev == j) ==> (j in s && j.next == i && i.prev.next == i && j.next.prev == j)))))
 }

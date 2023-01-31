@@ -163,9 +163,6 @@ func New(n int) (res *Ring /*@, ghost elems set[*Ring] @*/) {
 		q.next.prev = q
 		p = q
 		//@ elems = elems union set[*Ring]{p}
-		//@ assume forall i *Ring :: i in elems ==> p != i
-		//# Gobra cannot establish this fact on its own and therefore fails to fold the predicate
-		//# The assumption is safe since whenever a new element is inserted it is different from the oned already in the structure.
 		//@ fold r.Mem(elems, true)
 	}
 	res = r
@@ -194,7 +191,7 @@ func New(n int) (res *Ring /*@, ghost elems set[*Ring] @*/) {
 //@ ensures  res == old(unfolding r.Mem(elemsR, true) in r.next)
 //@ ensures  (s != nil && !(s in elemsR)) ==> res.Mem((elemsR union elemsS), true)
 //@ ensures  (s != nil && s in elemsR && r == s && len(elemsR) == 1) ==> res.Mem((elemsR), true)
-//@ ensures  (s != nil && s in elemsR && r == s && len(elemsR) > 1) ==> res.Mem((elemsR setminus (set[*Ring]{r})), true)
+//# ensures  (s != nil && s in elemsR && r == s && len(elemsR) > 1) ==> res.Mem((elemsR setminus (set[*Ring]{r})), true) UNIMPLEMENTED
 //# ensures  (s != nil && s in elemsR && r != s && len(elemsR) == 1) ==> UNIMPLEMENTED
 //@ decreases
 func (r *Ring) Link(s *Ring /*@, ghost elemsR set[*Ring], ghost elemsS set[*Ring] @*/) (res *Ring) {
@@ -219,11 +216,6 @@ func (r *Ring) Link(s *Ring /*@, ghost elemsR set[*Ring], ghost elemsS set[*Ring
 		/*@
 		ghost if !(s in elemsR){
 			//# In this case r and s are from different ring structures. The rings get linked together forming a larger ring containing both elemsS and elemsR.
-			assert n != p
-			assert s != r
-			assume forall i *Ring :: i in (elemsR union elemsS) ==> (i.next != i && i.prev != i)
-			//# Gobra cannot establish this above fact in the case where len(elemsS) == 1 && len(elemsR) == 1 and thus the fold would fail.
-			//# Even in this case the assumption is still safe. We have a ring structure consisting of r == n and s == p
 			fold n.Mem((elemsR union elemsS), true)
 		} else {
 			ghost if r == s {
@@ -232,12 +224,10 @@ func (r *Ring) Link(s *Ring /*@, ghost elemsR set[*Ring], ghost elemsS set[*Ring
 					fold n.Mem(elemsR, true)
 				}
 				ghost if len(elemsR) > 1 {
-					//# In this case r == s formed a ring structure that also contains other elements.
-					//# The resulting ring structure contains the same elements as before except r == s.
-					//@ assume len(elemsR) > 2 ==> (forall i *Ring :: i in (elemsR setminus (set[*Ring]{r})) ==> (i.next != i && i.prev != i))
-					//# The assumption is necessary to fold the predicate. This is because the predicate does not enforce that all its elements form a single ring structure.
-					//# Thus, the prediate allows that initially r.next==r.prev even when len(elemsR) > 2.
-					//@ fold n.Mem((elemsR setminus (set[*Ring]{r})), true)
+					//# UNIMPLEMENTED
+					//# In this case r == s formed a ring structure also containing other elements.
+					//# We want to prove n.Mem((elemsR setminus (set[*Ring]{r})), true).
+					//# This is not possible with the current abstraction because it could be that n == r.
 				}
 			} else {
 				//# UNIMPLEMENTED
