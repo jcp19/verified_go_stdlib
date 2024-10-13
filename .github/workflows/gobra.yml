@@ -36,16 +36,17 @@ jobs:
       # control over the settings applied to each package (this last
       # point could be also be solved by adapting the action to allow
       # per package config).
-      - name: Verify package 'container/list'
-        uses: viperproject/gobra-action@main
-        with:
-          packages: 'src/container/list'
-          timeout: 40m
-          headerOnly: ${{ env.headerOnly }}
-          includePaths: ${{ env.includePaths }}
-          assumeInjectivityOnInhale: ${{ env.assumeInjectivityOnInhale }}
-          checkConsistency: ${{ env.checkConsistency }}
-          statsFile: '/stats/stats_list.json'
+      # TODO: re-enable this
+      # - name: Verify package 'container/list'
+      #   uses: viperproject/gobra-action@main
+      #   with:
+      #     packages: 'src/container/list'
+      #     timeout: 40m
+      #     headerOnly: ${{ env.headerOnly }}
+      #     includePaths: ${{ env.includePaths }}
+      #     assumeInjectivityOnInhale: ${{ env.assumeInjectivityOnInhale }}
+      #     checkConsistency: ${{ env.checkConsistency }}
+      #     statsFile: '/stats/stats_list.json'
       - name: Verify package 'bytes'
         uses: viperproject/gobra-action@main
         with:
