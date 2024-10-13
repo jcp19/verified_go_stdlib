@@ -962,8 +962,18 @@ func Map(mapping func(r rune) rune, s []byte) []byte {
 // It panics if count is negative or if
 // the result of (len(b) * count) overflows.
 //
-// @ trusted // TODO
-func Repeat(b []byte, count int) []byte {
+// @ requires count >= 0
+//
+// @ requires count == 0 || len(b)*count/count == len(b)
+//
+// @ preserves acc(sl.Bytes(b, 0, len(b)), R40)
+//
+// @ ensures len(res) > 0 ==> sl.Bytes(res, 0, len(res))
+//
+// @ ensures len(res) > 0 ==> View(res) == SpecRepeat(View(b), count)
+//
+// @ // TODO: this is extremely slow to verify sometimes
+func Repeat(b []byte, count int) (res []byte) {
 	if count == 0 {
 		return []byte{}
 	}
@@ -978,10 +988,68 @@ func Repeat(b []byte, count int) []byte {
 	}
 
 	nb := make([]byte, len(b)*count)
-	bp := copy(nb, b /* @, R40 @ */)
+	// @ unfold acc(sl.Bytes(b, 0, len(b)), R41)
+	bp := copy(nb, b /* @, R41 @ */)
+	// @ ghost i := 1
+	// @ fold acc(sl.Bytes(b, 0, len(b)), R41)
+	// @ fold sl.Bytes(nb, 0, len(nb))
+
+	// @ assert View(nb)[:bp] == View(b)
+	// @ lemmaSpecRepeat_1(View(b))
+	// @ assert SpecRepeat(View(b), 1) == View(b)
+
+	// @ invariant 0 < count
+	// @ invariant 0 < i
+	// @ invariant bp == len(b) * i
+	// @ invariant bp >= 0
+	// @ invariant acc(sl.Bytes(b, 0, len(b)), R41)
+	// @ invariant sl.Bytes(nb, 0, len(nb))
+	// @ invariant View(nb)[:MinInt(count, i) * len(b)] == SpecRepeat(View(b), MinInt(count, i))
 	for bp < len(nb) {
+		// @ unfold sl.Bytes(nb, 0, len(nb))
+		// @ assert 0 <= bp && bp <= len(nb)
+		// @ assert bp == MinInt(count, i) * len(b)
+		// @ SubSliceOverlaps(nb, bp, len(nb))
+		// @ SubSliceOverlaps(nb, 0, bp)
 		copy(nb[bp:], nb[:bp] /* @, R40 @ */)
+		// @ fold sl.Bytes(nb, 0, len(nb))
+		// @ assume View(nb)[:i * len(b)] ++ View(nb)[:i * len(b)] == View(nb)[: MinInt(count, i*2) * len(b)]
+		// @ lemmaSpecRepeat_2n(View(b), i)
+		// @ assert View(nb)[:i * len(b)] ++ View(nb)[:i * len(b)] == SpecRepeat(View(b), 2 * i)[: MinInt(count, i*2) * len(b)]
+		// @ lemmaEqTransitive_seq(View(nb)[: MinInt(count, i*2) * len(b)], View(nb)[:i * len(b)] ++ View(nb)[:i * len(b)], View(nb)[: MinInt(count, i*2) * len(b)])
+		// @ assert View(nb)[: MinInt(count, i*2) * len(b)] == SpecRepeat(View(b), 2 * i)[: MinInt(count, i*2) * len(b)]
+		// @ vb := View(b)
+		// @ vnb := View(nb)
+		// @ assert 0 < count
+		// @ assert sl.Bytes(nb, 0, len(nb))
+
+		// @ decreases
+		// @ requires acc(sl.Bytes(b, 0, len(b)), R50)
+		// @ requires acc(sl.Bytes(nb, 0, len(nb)), R50)
+		// @ requires 0 < count
+		// @ requires 0 < i
+		// @ requires View(nb)[:MinInt(count, i*2) * len(b)] == SpecRepeat(View(b), MinInt(count, i*2))
+		// @ preserves 0 <= bp
+		// @ preserves bp == len(b) * i
+		// @ ensures 0 < count
+		// @ ensures 0 < i
+		// @ ensures acc(sl.Bytes(b, 0, len(b)), R50)
+		// @ ensures acc(sl.Bytes(nb, 0, len(nb)), R50)
+		// @ ensures View(nb)[:MinInt(count, i) * len(b)] == SpecRepeat(View(b), MinInt(count, i))
+		// @ outline (
+		// @ lemmaMul2Inj(bp, i, bp*2, i*2, len(b))
 		bp *= 2
+		// @ assert View(nb)[:MinInt(count, i*2) * len(b)] == SpecRepeat(View(b), MinInt(count, i*2))
+		// @ i *= 2
+		// @ assert View(nb)[:MinInt(count, i) * len(b)] == SpecRepeat(View(b), MinInt(count, i))
+		// @ )
+		// @ assert 0 < i
+		// @ assert bp == len(b) * i
+		// @ assert bp >= 0
+		// @ assert sl.Bytes(nb, 0, len(nb))
+		// @ assert vnb == View(nb)
+		// @ assert vb == View(b)
+		// @ assert View(nb)[:MinInt(count, i) * len(b)] == SpecRepeat(View(b), MinInt(count, i))
 	}
 	return nb
 }
