@@ -47,7 +47,7 @@ jobs:
           checkConsistency: ${{ env.checkConsistency }}
           statsFile: '/stats/stats_list.json'
       - name: Upload the verification report
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: stats_list.json
           path: /stats/stats_list.json
