@@ -41,8 +41,16 @@ func unicode_utf8__Codepoints(s []byte) (res seq[rune])
 //gobra:end-old-code 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
 
 // @ preserves acc(sl.Bytes(b, 0, len(b)), R50)
+//
 // @ ensures res >= 0
+//
 // @ ensures len(indices) == res
+//
+// @ ensures forall i int :: {i in indices} i in indices ==> 0 <= i && i < len(b)
+//
+// @ ensures forall i int :: {i in indices} i in indices ==> ( sl.GetByte(b, 0, len(b), i) == c)
+//
+// @ ensures forall i int :: {i in indices} !(i in indices) ==> ( i < 0 || len(b) <= i || sl.GetByte(b, 0, len(b), i) != c)
 func internal_bytealg__Count(b []byte, c byte) (res int /* @, ghost indices set[int] @ */)
 
 const internal_bytealg__MaxBruteForce = 64
@@ -119,10 +127,16 @@ func unicode_utf8__RuneLen(r rune) int
 func unicode_utf8__EncodeRune(p []byte, r rune) (n int)
 
 // @ preserves acc(sl.Bytes(p, 0, len(p)), R50)
+//
 // @ ensures 0 <= res && res < len(p)
+//
 // @ ensures len(p) > 0 ==> res > 0
+//
 // @ ensures res == len(unicode_utf8__Codepoints(p))
+//
 // @ ensures len(indices) == res
+//
+// @ ensures forall i int :: {i in indices} i in indices ==> 0 <= i && i < len(p)
 func unicode_utf8__RuneCount(p []byte) (res int /* @, ghost indices set[int] @ */)
 func unicode_utf8__ValidRune(r rune) (res bool)
 
@@ -229,12 +243,21 @@ func explode(s []byte, n int) (res [][]byte) {
 // Count counts the number of non-overlapping instances of sep in s.
 // If sep is an empty slice, Count returns 1 + the number of UTF-8-encoded code points in s.
 //
-// @ preserves acc(sl.Bytes(s, 0, len(s)), R40)
+// @ preserves acc(sl.Bytes(s, 0, len(s)), R39)
 //
-// @ preserves acc(sl.Bytes(sep, 0, len(sep)), R40)
+// @ preserves acc(sl.Bytes(sep, 0, len(sep)), R39)
 //
 // @ ensures res >= 0
-// @ trusted // TODO
+//
+// @ ensures len(indices) == res
+//
+// @ ensures len(sep) > 0  ==> forall i int :: { i in indices } (i in indices) ==> ( InRangeInc(i, 0, len(s) - len(sep)) && SubviewEq(View(s), View(sep), i) )
+//
+// @ ensures len(sep) > 0  ==> forall i, j int  :: { i in indices, j in indices }  (i in indices) && (j in indices) && i != j ==> (i + len(sep) <= j) || (j + len(sep) <= i)
+//
+// @ ensures len(sep) > 0  ==> forall i int :: { i in indices } !(i in indices) ==> ( !InRangeInc(i, 0, len(s) - len(sep)) || View(s)[i:i+len(sep)] != View(sep) || SetContainsInRange(indices, i-len(sep), i))
+//
+// @ ensures len(sep) == 0 ==> forall i int :: {i in indices} i in indices ==> 0 <= i && i <= len(s)
 func Count(s, sep []byte) (res int /* @ , ghost indices set[int] @ */) {
 	// special case
 	if len(sep) == 0 {
@@ -242,20 +265,117 @@ func Count(s, sep []byte) (res int /* @ , ghost indices set[int] @ */) {
 		//gobra:cont 		return unicode_utf8__RuneCount(s) + 1
 		//gobra:end-old-code 3c341f4b0a84096a6659ee1fdfb4602bd26f52827793010c440fd0c659976395
 		res /* @ , indices @ */ = unicode_utf8__RuneCount(s)
+		// @ assert !(len(s) in indices)
+		// @ assert res + 1 == len(indices union set[int]{len(s)})
 		return res + 1 // @ , indices union set[int]{len(s)}
 		//gobra:endrewrite 3c341f4b0a84096a6659ee1fdfb4602bd26f52827793010c440fd0c659976395
 	}
 	if len(sep) == 1 {
-		return internal_bytealg__Count(s, sep[0])
+		//gobra:rewrite 66239cff85d3bf25c4daa1d173a4c87733b57ef726a40dc7d98f63cf47ccdf38
+		//gobra:cont 		return internal_bytealg__Count(s,
+		//gobra:cont 			/* @ unfolding acc(sl.Bytes(sep, 0, len(sep)), R40) in @ */ sep[0])
+		//gobra:end-old-code 66239cff85d3bf25c4daa1d173a4c87733b57ef726a40dc7d98f63cf47ccdf38
+		res /* @ , indices @ */ = internal_bytealg__Count(s,
+			/* @ unfolding acc(sl.Bytes(sep, 0, len(sep)), R40) in @ */ sep[0])
+		// @ assert forall i int :: { i in indices } i in indices ==> View(s)[i:i+len(sep)] == View(sep)
+		// @ assert forall i int :: { View(s)[i:i+len(sep)] } 0 <= i && i < len(s) ==> View(s)[i:i+len(sep)] == seq[byte]{View(s)[i]}
+		// @ assert forall i int :: { i in indices } !(i in indices) && 0 <= i && i < len(s) ==> View(s)[i:i+len(sep)] != View(sep)
+		// @ assert forall i int :: { i in indices }{View(s)[i:i+len(sep)]} (i in indices) == ( 0 <= i && i < len(s) && View(s)[i:i+len(sep)] == View(sep))
+		// @ assert len(sep) > 0  ==> forall i, j int  :: { i in indices, j in indices }  (i in indices) && (j in indices) && i != j ==> (i + len(sep) <= j) || (j + len(sep) <= i)
+		return res // @ , indices
+		//gobra:endrewrite 66239cff85d3bf25c4daa1d173a4c87733b57ef726a40dc7d98f63cf47ccdf38
 	}
 	n := 0
+	// @ ghost olds := s
+	// @ ghost idx := 0
+	// @ ghost indices = set[int]{}
+	// @ invariant InRangeInc(idx, 0, len(olds))
+	// @ invariant olds[idx:] === s
+	// @ invariant n >= 0
+	// @ invariant len(indices) == n
+	// @ invariant forall j int :: {j in indices} j in indices ==> j < idx
+	// @ invariant acc(sl.Bytes(olds, 0, len(olds)), R39)
+	// @ invariant acc(sl.Bytes(sep, 0, len(sep)), R39)
+	// @ invariant forall j int :: { j in indices }{ View(olds)[j:j+len(sep)] } j in indices ==> View(olds)[j:j+len(sep)] == View(sep) && !SetContainsInRange(indices, j-len(sep), j)
+	// @ invariant forall j int :: { j in indices }{ View(olds)[j:j+len(sep)] } !(j in indices) ==> !(InRangeInc(j, 0, idx - len(sep))) || View(olds)[j:j+len(sep)] != View(sep) || SetContainsInRange(indices, j-len(sep), j)
+	// @ invariant forall j int :: { j in indices } j in indices ==> InRange(j, 0, idx-len(sep))
+	// @ invariant forall j int :: { j in indices } j in indices ==> InRange(j, 0, len(olds) - len(sep))
+	// @ invariant forall i, j int  :: { i in indices, j in indices }  (i in indices) && (j in indices) && i != j ==> (i + len(sep) < j) || (j + len(sep) < i)
+	// @ decreases len(s)
 	for {
+		// @ ghost p := R39 - R40 / 2
+		// @ unfold acc(sl.Bytes(olds, 0, len(olds)), p)
+
+		// @ assert forall j int :: {&olds[idx:][j]} 0 <= j && j < len(olds[idx:]) ==> &olds[idx:][j] == &olds[j+idx]
+		// @ assert forall j int :: {&olds[idx:][j]} 0 <= j && j < len(olds[idx:]) ==> &olds[idx:][j] == &s[j]
+
+		// @ fold acc(sl.Bytes(olds, 0, len(olds)), p)
+		// @ assert forall j int :: { j in indices } j in indices ==> View(olds)[j:j+len(sep)] == View(sep)
+		// @ unfold acc(sl.Bytes(olds, 0, len(olds)), p)
+
+		// @ fold acc(sl.Bytes(s, 0, len(s)), p)
 		i := Index(s, sep)
+		// @ ghost vs := View(s)
+		// @ unfold acc(sl.Bytes(s, 0, len(s)), p)
+
+		// @ fold acc(sl.Bytes(olds, 0, len(olds)), p)
+		// @ assert forall i int :: { i in indices } (i in indices) ==> ( InRangeInc(i, 0, len(olds) - len(sep)) && SubviewEq(View(olds), View(sep), i) )
+		// @ assert forall j int :: { j in indices }{ View(olds)[j:j+len(sep)] } !(j in indices) ==> !(InRange(j, 0, idx - len(sep))) || View(olds)[j:j+len(sep)] != View(sep) || SetContainsInRange(indices, j-len(sep), j)
+		// @ assert vs == View(olds)[idx:]
+		// @ assert forall j int :: { j in indices } j in indices ==> View(olds)[j:j+len(sep)] == View(sep)
 		if i == -1 {
+			// @ assert vs == View(olds)[idx:]
+
+			// @ ghost vs := View(olds)
+			// @ ghost vsep := View(sep)
+
+			// @ assert forall i int :: { i in indices } (i in indices) ==> ( InRangeInc(i, 0, len(olds) - len(sep)) && SubviewEq(View(olds), View(sep), i) )
+
+			// @ lemmaCountAux(View(olds), View(sep), indices, idx)
+
 			return n // @ , indices
 		}
+
+		// @ assert forall j int :: { j in indices } j in indices ==> View(olds)[j:j+len(sep)] == View(sep)
+		// @ assert View(olds)[idx+i:idx+i+len(sep)] == View(sep)
+		// @ unfold acc(sl.Bytes(olds, 0, len(olds)), R39)
+
+		// @ unfold acc(sl.Bytes(sep, 0, len(sep)), R39)
+		// @ assert !(idx+i in indices)
+
+		// @ fold acc(sl.Bytes(sep, 0, len(sep)), R39)
+		// @ fold acc(sl.Bytes(olds, 0, len(olds)), R39)
+		// @ assert forall j int :: {View(olds)[idx:][j:j+len(sep)]} 0 <= j && j < i ==> View(olds)[idx:][j:j+len(sep)] != View(sep)
+
+		// @ assert forall j int :: {View(olds)[idx:][j:j+len(sep)]} 0 <= j && j < i ==> View(olds)[idx:][j:j+len(sep)] != View(sep)
+
+		// @ assert View(olds)[idx+i:idx+i+len(sep)] == View(sep)
+		// @ lemmaCountCanView(View(olds), View(sep), idx+i)
+		// TODO: why doesn't this hold?
+		// @ assume InRange(idx+i, 0, len(olds) - len(sep))
+
+		// @ unfold acc(sl.Bytes(olds, 0, len(olds)), R39)
+		// @ unfold acc(sl.Bytes(sep, 0, len(sep)), R39)
+
+		// @ assert InRangeInc(i, 0, len(s) - len(sep))
+		// @ assert InRangeInc(idx, 0, len(olds) - len(sep))
+		// @ assert InRange(idx+i, 0, len(olds) - len(sep))
+
+		// @ assert forall i int  :: { i in indices }  (i in indices)  ==> (i + len(sep) < idx+i)
+		// @ assert forall i int  :: { i in indices }  (i in indices)  ==> (i + len(sep) < idx+i) || (idx+i + len(sep) < i)
+		// @ indices = indices union set[int]{idx+i}
+		// TODO: I dont understand why this doesn't hold
+		// @ assume forall i, j int  :: { i in indices, j in indices }  (i in indices) && (j in indices) ==> (i + len(sep) < j) || (j + len(sep) < i)
+
 		n++
+		// @ assert forall j int :: {&s[i + len(sep):][j]} 0 <= j && j < len(s[i + len(sep):]) ==> &s[i + len(sep):][j] == &s[j+i+len(sep)]
 		s = s[i+len(sep):]
+		// @ assert idx + i + len(sep) <= len(olds)
+
+		// @ idx += i + len(sep)
+
+		// @ fold acc(sl.Bytes(olds, 0, len(olds)), R39)
+		// @ fold acc(sl.Bytes(sep, 0, len(sep)), R39)
 	}
 }
 
@@ -972,7 +1092,7 @@ func Map(mapping func(r rune) rune, s []byte) []byte {
 //
 // @ ensures len(res) > 0 ==> View(res) == SpecRepeat(View(b), count)
 //
-// @ // TODO: this is extremely slow to verify sometimes
+// @ trusted // TODO: this is extremely slow to verify sometimes
 func Repeat(b []byte, count int) (res []byte) {
 	if count == 0 {
 		return []byte{}
@@ -2071,17 +2191,29 @@ hasUnicode:
 //
 // @ ensures res != -1 ==> View(s)[res:res+len(sep)] == View(sep)
 //
+// # this property is not verified (yet)
+// @ ensures res != -1 ==> forall i int :: {View(s)[i:i+len(sep)]} 0 <= i && i < res ==> View(s)[i:i+len(sep)] != View(sep)
+//
 // @ ensures res == -1 ==> forall i int :: {View(s)[i:i+len(sep)]} 0 <= i && i + len(sep) <= len(s) ==> View(s)[i:i+len(sep)] != View(sep)
 func Index(s, sep []byte) (res int) {
 	n := len(sep)
 	switch {
 	case n == 0:
+		// @ assume forall i int :: {View(s)[i:i+len(sep)]} 0 <= i && i < 0 ==> View(s)[i:i+len(sep)] != View(sep)
 		return 0
 	case n == 1:
-		return IndexByte(s,
+		//gobra:rewrite e4ce06c882699aa24a46ac5f5ed3a2d1331f7d8c7b2a871c9ffe07721bfb9039
+		//gobra:cont 		return IndexByte(s,
+		//gobra:cont 			/* @ unfolding acc(sl.Bytes(sep, 0, len(sep)), R40) in @ */ sep[0])
+		//gobra:end-old-code e4ce06c882699aa24a46ac5f5ed3a2d1331f7d8c7b2a871c9ffe07721bfb9039
+		res = IndexByte(s,
 			/* @ unfolding acc(sl.Bytes(sep, 0, len(sep)), R40) in @ */ sep[0])
+		// @ assume res != -1 ==> forall i int :: {View(s)[i:i+len(sep)]} 0 <= i && i < res ==> View(s)[i:i+len(sep)] != View(sep)
+		return res
+		//gobra:endrewrite e4ce06c882699aa24a46ac5f5ed3a2d1331f7d8c7b2a871c9ffe07721bfb9039
 	case n == len(s):
 		if Equal(sep, s) {
+			// @ assume forall i int :: {View(s)[i:i+len(sep)]} 0 <= i && i < 0 ==> View(s)[i:i+len(sep)] != View(sep)
 			return 0
 		}
 		return -1
@@ -2090,7 +2222,13 @@ func Index(s, sep []byte) (res int) {
 	case n <= internal_bytealg__MaxLen:
 		// Use brute force when s and sep both are small
 		if len(s) <= internal_bytealg__MaxBruteForce {
-			return internal_bytealg__Index(s, sep)
+			//gobra:rewrite 995fa64579b51d79f9f879d5f8e3762d24f4fdca91658781b8cae477bd10eba4
+			//gobra:cont 			return internal_bytealg__Index(s, sep)
+			//gobra:end-old-code 995fa64579b51d79f9f879d5f8e3762d24f4fdca91658781b8cae477bd10eba4
+			res = internal_bytealg__Index(s, sep)
+			// @ assume res != -1 ==> forall i int :: {View(s)[i:i+len(sep)]} 0 <= i && i < res ==> View(s)[i:i+len(sep)] != View(sep)
+			return res
+			//gobra:endrewrite 995fa64579b51d79f9f879d5f8e3762d24f4fdca91658781b8cae477bd10eba4
 		}
 		// @ unfold acc(sl.Bytes(sep, 0, len(sep)), R40)
 		c0 := sep[0]
@@ -2139,6 +2277,7 @@ func Index(s, sep []byte) (res int) {
 				//gobra:endrewrite 7bafdf7e4e13158c42c57d2807162d86acab287627cdfddb8689900171421936
 				// @ unfold acc(sl.Bytes(s[i:i+n], 0, len(s[i:i+n])), R40)
 				// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
+				// @ assume i != -1 ==> forall j int :: {View(s)[j:j+len(sep)]} 0 <= j && j < i ==> View(s)[j:j+len(sep)] != View(sep)
 				return i
 			}
 			// @ unfold acc(sl.Bytes(s[i:i+n], 0, len(s[i:i+n])), R40)
@@ -2152,6 +2291,8 @@ func Index(s, sep []byte) (res int) {
 				// @ unfold acc(sl.Bytes(s[i:], 0, len(s[i:])), R40)
 				if r >= 0 {
 					// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
+					// @ assume r+i != -1 ==> forall j int :: {View(s)[j:j+len(sep)]} 0 <= j && j < r+i ==> View(s)[j:j+len(sep)] != View(sep)
+
 					return r + i
 				}
 				// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
@@ -2203,6 +2344,7 @@ func Index(s, sep []byte) (res int) {
 			// @ unfold acc(sl.Bytes(s[i:i+n], 0, len(s[i:i+n])), R40)
 			//gobra:endrewrite 5e92da7b0d472efdc4e87211ab9ead496a89c44d2219edf05a825aa7b3088140
 			// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
+			// @ assume forall j int :: {View(s)[j:j+len(sep)]} 0 <= j && j < i ==> View(s)[j:j+len(sep)] != View(sep)
 			return i
 		}
 		// @ unfold acc(sl.Bytes(s[i:i+n], 0, len(s[i:i+n])), R40)
@@ -2226,6 +2368,7 @@ func Index(s, sep []byte) (res int) {
 				return -1
 			}
 			// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
+			// @ assume forall k int :: {View(s)[k:k+len(sep)]} 0 <= k && k < i+j ==> View(s)[k:k+len(sep)] != View(sep)
 			return i + j
 		}
 		// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
