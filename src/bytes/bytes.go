@@ -8,171 +8,21 @@ package bytes
 
 //+gobra
 
-// @ import (
-// @	. "verification/utils/definitions"
-// @	b "verification/utils/bitwise"
-// @	sl "verification/utils/slices"
-// @	seqs "verification/utils/seqs"
-// @	sets "verification/utils/sets"
-// @ )
-
-// the following is some bookkeeping since we have not (yet) specified
-// "internal/bytealg", "unicode", or "unicode/utf8"
-//
-// each function of the respective package is rewritten to instead
-// call one of the stubs below. Each function follows the convention
-// `package_path__FunctionName`, where `package_path` is the path of the
-// package, with `/` replaced by `_`.
-/* @
-
-// utf8.Codepoints(s) returns the sequence of (utf-8 encoded) codepoints in `s`
-ghost
-pure
-ensures 0 < len(s) ==> 0 < len(res)
-ensures 0 == len(s) ==> 0 == len(res)
-decreases
-func unicode_utf8__Codepoints(s []byte) (res seq[rune])
-
-
-@ */
-
-//gobra:rewrite 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
-//gobra:cont
-//gobra:end-old-code 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
-
-// @ preserves acc(sl.Bytes(b, 0, len(b)), R50)
-//
-// @ ensures res >= 0
-//
-// @ ensures len(indices) == res
-//
-// @ ensures forall i int :: {i in indices} i in indices ==> 0 <= i && i < len(b)
-//
-// @ ensures forall i int :: {i in indices} i in indices ==> ( sl.GetByte(b, 0, len(b), i) == c)
-//
-// @ ensures forall i int :: {i in indices} !(i in indices) ==> ( i < 0 || len(b) <= i || sl.GetByte(b, 0, len(b), i) != c)
-func internal_bytealg__Count(b []byte, c byte) (res int /* @, ghost indices set[int] @ */)
-
-const internal_bytealg__MaxBruteForce = 64
-
-func internal_bytealg__Cutover(n int) int
-
-// @ requires 2 <= len(b) && len(b) <= internal_bytealg__MaxLen
-// @ preserves acc(sl.Bytes(a, 0, len(a)), R40)
-// @ preserves acc(sl.Bytes(b, 0, len(b)), R40)
-// @ ensures 0 <= res && res + len(b) <= len(a)
-// @ ensures res != -1 ==> View(a)[res:res+len(b)] == View(b)
-// @ ensures res == -1 ==> !exists i int :: {View(a)[i:i+len(b)]} View(a)[i:i+len(b)] == View(b)
-func internal_bytealg__Index(a, b []byte) (res int)
-
-func internal_bytealg__IndexString(a, b string) int
-
-// @ preserves acc(sl.Bytes(b, 0, len(b)), R50)
-// @ ensures 0 <= res && res < len(b)
-// @ ensures res != -1 == ((forall i int :: {View(b)[i]} 0 <= i && i < res ==> View(b)[i] != c) && View(b)[res] == c)
-// @ ensures res == -1 == (forall i int :: {View(b)[i]} 0 <= i && i < len(b) ==> View(b)[i] != c)
-func internal_bytealg__IndexByte(b []byte, c byte) (res int)
-func internal_bytealg__IndexByteString(s string, c byte) int
-
-// @ preserves acc(sl.Bytes(a, 0, len(a)), R40)
-// @ preserves acc(sl.Bytes(b, 0, len(b)), R40)
-func internal_bytealg__Compare(a, b []byte) int
-
-var internal_bytealg__MaxLen int
-
-const internal_bytealg__PrimeRK = 16777619
-
-func internal_bytealg__HashStrRevBytes(sep []byte) (uint32, uint32)
-
-// @ preserves acc(sl.Bytes(s, 0, len(s)), R50)
-// @ preserves acc(sl.Bytes(sep, 0, len(sep)), R50)
-// @ ensures 0 <= res && res + len(sep) <= len(s)
-// @ ensures res != -1 ==> View(s)[res:res+len(sep)] == View(sep)
-// @ ensures res == -1 ==> !exists i int :: {View(s)[i:i+len(sep)]} View(s)[i:i+len(sep)] == View(sep)
-func internal_bytealg__IndexRabinKarpBytes(s, sep []byte) (res int)
-
-func unicode__IsDigit(r rune) bool
-func unicode__IsLetter(r rune) bool
-func unicode__IsSpace(r rune) bool
-
-const (
-	unicode_utf8__RuneError = '\uFFFD'
-	unicode_utf8__RuneSelf  = 0x80
-	unicode_utf8__MaxRune   = '\U0010FFFF'
-	unicode_utf8__UTFMax    = 4
+import (
+	// @	. "verification/utils/definitions"
+	// @	b "verification/utils/bitwise"
+	// @	sl "verification/utils/slices"
+	// @	seqs "verification/utils/seqs"
+	// @	sets "verification/utils/sets"
+	// @	. "bytes/spec"
+	"internal/bytealg"
+	"unicode"
+	"unicode/utf8"
 )
-
-// AppendRune appends the UTF-8 encoding of r to the end of p and
-// returns the extended buffer. If the rune is out of range,
-// it appends the encoding of [RuneError].
-func unicode_utf8__AppendRune(p []byte, r rune) []byte
-
-// @ preserves acc(sl.Bytes(p, 0, len(p)), R40)
-//
-// @ ensures len(p) > 0 ==> 1 <= size && size <= len(p)
-//
-// @ ensures len(p) == 0 ==> size == 0
-//
-// @ ensures len(p) > 0 ==> unicode_utf8__Codepoints(p)[0] == r && unicode_utf8__Codepoints(p[size:]) == unicode_utf8__Codepoints(p)[1:]
-func unicode_utf8__DecodeRune(p []byte) (r rune, size int)
-
-// @ preserves forall i int :: {&p[i]} 0 <= i && i < len(p) ==> acc(&p[i], R50)
-// @ ensures 1 <= size && size <= len(p)
-func unicode_utf8__DecodeLastRune(p []byte) (r rune, size int)
-func unicode_utf8__RuneLen(r rune) int
-
-// @ requires forall i int :: {&p[i]} 0 <= i && i < len(p) ==> acc(&p[i])
-// @ ensures forall i int :: {&p[i]} 0 <= i && i < len(p) ==> acc(&p[i])
-// @ ensures 0 <= n && n <= unicode_utf8__UTFMax
-func unicode_utf8__EncodeRune(p []byte, r rune) (n int)
-
-// @ preserves acc(sl.Bytes(p, 0, len(p)), R50)
-//
-// @ ensures 0 <= res && res < len(p)
-//
-// @ ensures len(p) > 0 ==> res > 0
-//
-// @ ensures res == len(unicode_utf8__Codepoints(p))
-//
-// @ ensures len(indices) == res
-//
-// @ ensures forall i int :: {i in indices} i in indices ==> 0 <= i && i < len(p)
-func unicode_utf8__RuneCount(p []byte) (res int /* @, ghost indices set[int] @ */)
-func unicode_utf8__ValidRune(r rune) (res bool)
-
-type unicode__d [4]rune // to make the CaseRanges text shorter
-type unicode__CaseRange struct {
-	Lo    uint32
-	Hi    uint32
-	Delta unicode__d
-}
-type unicode__SpecialCase []unicode__CaseRange
-
-func unicode__ToUpper(r rune) rune
-func unicode__ToLower(r rune) rune
-func unicode__ToTitle(r rune) rune
-func (special unicode__SpecialCase) unicode__ToUpper(r rune) rune
-func (special unicode__SpecialCase) unicode__ToTitle(r rune) rune
-func (special unicode__SpecialCase) unicode__ToLower(r rune) rune
-func unicode__SimpleFold(r rune) rune
-
-//gobra:endrewrite 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
 
 /* @
 
 // lemmas
-
-ghost
-requires 0 < p
-requires acc(sl.Bytes(a, 0, len(a)), p)
-requires acc(sl.Bytes(b, 0, len(b)), p)
-requires r == ((unfolding acc(sl.Bytes(a, 0, len(a)), p) in string(a)) == (unfolding acc(sl.Bytes(b, 0, len(b)), p) in string(b)))
-ensures acc(sl.Bytes(a, 0, len(a)), p)
-ensures acc(sl.Bytes(b, 0, len(b)), p)
-ensures r == (View(a) == View(b))
-decreases
-func stringEqualsImplViewEquals(r bool, a, b []byte, p perm)
-
 
 requires forall i int :: {&a[i]} 0 <= i && i < len(a) ==> acc(&a[i], _)
 requires forall i int :: {&b[i]} 0 <= i && i < len(b) ==> acc(&b[i], _)
@@ -209,7 +59,7 @@ func Equal(a, b []byte) (res bool) {
 //
 // @ preserves acc(sl.Bytes(b, 0, len(b)), R40)
 func Compare(a, b []byte) int {
-	return internal_bytealg__Compare(a, b)
+	return bytealg.Compare(a, b)
 }
 
 // explode splits s into a slice of UTF-8 sequences, one per Unicode code point (still slices of bytes),
@@ -232,7 +82,7 @@ func explode(s []byte, n int) (res [][]byte) {
 			na++
 			break
 		}
-		_, size = unicode_utf8__DecodeRune(s)
+		_, size = utf8.DecodeRune(s)
 		a[na] = s[0:size:size]
 		s = s[size:]
 		na++
@@ -264,24 +114,18 @@ func Count(s, sep []byte) (res int /* @ , ghost indices set[int] @ */) {
 		//gobra:rewrite 3c341f4b0a84096a6659ee1fdfb4602bd26f52827793010c440fd0c659976395
 		//gobra:cont 		return unicode_utf8__RuneCount(s) + 1
 		//gobra:end-old-code 3c341f4b0a84096a6659ee1fdfb4602bd26f52827793010c440fd0c659976395
-		res /* @ , indices @ */ = unicode_utf8__RuneCount(s)
-		// @ assert !(len(s) in indices)
-		// @ assert res + 1 == len(indices union set[int]{len(s)})
+		res /* @ , indices @ */ = utf8.RuneCount(s)
 		return res + 1 // @ , indices union set[int]{len(s)}
 		//gobra:endrewrite 3c341f4b0a84096a6659ee1fdfb4602bd26f52827793010c440fd0c659976395
 	}
 	if len(sep) == 1 {
 		//gobra:rewrite 66239cff85d3bf25c4daa1d173a4c87733b57ef726a40dc7d98f63cf47ccdf38
-		//gobra:cont 		return internal_bytealg__Count(s,
+		//gobra:cont 		return bytealg.Count(s,
 		//gobra:cont 			/* @ unfolding acc(sl.Bytes(sep, 0, len(sep)), R40) in @ */ sep[0])
 		//gobra:end-old-code 66239cff85d3bf25c4daa1d173a4c87733b57ef726a40dc7d98f63cf47ccdf38
-		res /* @ , indices @ */ = internal_bytealg__Count(s,
+		res /* @ , indices @ */ = bytealg.Count(s,
 			/* @ unfolding acc(sl.Bytes(sep, 0, len(sep)), R40) in @ */ sep[0])
-		// @ assert forall i int :: { i in indices } i in indices ==> View(s)[i:i+len(sep)] == View(sep)
 		// @ assert forall i int :: { View(s)[i:i+len(sep)] } 0 <= i && i < len(s) ==> View(s)[i:i+len(sep)] == seq[byte]{View(s)[i]}
-		// @ assert forall i int :: { i in indices } !(i in indices) && 0 <= i && i < len(s) ==> View(s)[i:i+len(sep)] != View(sep)
-		// @ assert forall i int :: { i in indices }{View(s)[i:i+len(sep)]} (i in indices) == ( 0 <= i && i < len(s) && View(s)[i:i+len(sep)] == View(sep))
-		// @ assert len(sep) > 0  ==> forall i, j int  :: { i in indices, j in indices }  (i in indices) && (j in indices) && i != j ==> (i + len(sep) <= j) || (j + len(sep) <= i)
 		return res // @ , indices
 		//gobra:endrewrite 66239cff85d3bf25c4daa1d173a4c87733b57ef726a40dc7d98f63cf47ccdf38
 	}
@@ -307,10 +151,8 @@ func Count(s, sep []byte) (res int /* @ , ghost indices set[int] @ */) {
 		// @ unfold acc(sl.Bytes(olds, 0, len(olds)), p)
 
 		// @ assert forall j int :: {&olds[idx:][j]} 0 <= j && j < len(olds[idx:]) ==> &olds[idx:][j] == &olds[j+idx]
-		// @ assert forall j int :: {&olds[idx:][j]} 0 <= j && j < len(olds[idx:]) ==> &olds[idx:][j] == &s[j]
 
 		// @ fold acc(sl.Bytes(olds, 0, len(olds)), p)
-		// @ assert forall j int :: { j in indices } j in indices ==> View(olds)[j:j+len(sep)] == View(sep)
 		// @ unfold acc(sl.Bytes(olds, 0, len(olds)), p)
 
 		// @ fold acc(sl.Bytes(s, 0, len(s)), p)
@@ -319,37 +161,24 @@ func Count(s, sep []byte) (res int /* @ , ghost indices set[int] @ */) {
 		// @ unfold acc(sl.Bytes(s, 0, len(s)), p)
 
 		// @ fold acc(sl.Bytes(olds, 0, len(olds)), p)
-		// @ assert forall i int :: { i in indices } (i in indices) ==> ( InRangeInc(i, 0, len(olds) - len(sep)) && SubviewEq(View(olds), View(sep), i) )
-		// @ assert forall j int :: { j in indices }{ View(olds)[j:j+len(sep)] } !(j in indices) ==> !(InRange(j, 0, idx - len(sep))) || View(olds)[j:j+len(sep)] != View(sep) || SetContainsInRange(indices, j-len(sep), j)
 		// @ assert vs == View(olds)[idx:]
-		// @ assert forall j int :: { j in indices } j in indices ==> View(olds)[j:j+len(sep)] == View(sep)
 		if i == -1 {
-			// @ assert vs == View(olds)[idx:]
 
 			// @ ghost vs := View(olds)
 			// @ ghost vsep := View(sep)
-
-			// @ assert forall i int :: { i in indices } (i in indices) ==> ( InRangeInc(i, 0, len(olds) - len(sep)) && SubviewEq(View(olds), View(sep), i) )
 
 			// @ lemmaCountAux(View(olds), View(sep), indices, idx)
 
 			return n // @ , indices
 		}
 
-		// @ assert forall j int :: { j in indices } j in indices ==> View(olds)[j:j+len(sep)] == View(sep)
-		// @ assert View(olds)[idx+i:idx+i+len(sep)] == View(sep)
 		// @ unfold acc(sl.Bytes(olds, 0, len(olds)), R39)
 
 		// @ unfold acc(sl.Bytes(sep, 0, len(sep)), R39)
-		// @ assert !(idx+i in indices)
 
 		// @ fold acc(sl.Bytes(sep, 0, len(sep)), R39)
 		// @ fold acc(sl.Bytes(olds, 0, len(olds)), R39)
-		// @ assert forall j int :: {View(olds)[idx:][j:j+len(sep)]} 0 <= j && j < i ==> View(olds)[idx:][j:j+len(sep)] != View(sep)
 
-		// @ assert forall j int :: {View(olds)[idx:][j:j+len(sep)]} 0 <= j && j < i ==> View(olds)[idx:][j:j+len(sep)] != View(sep)
-
-		// @ assert View(olds)[idx+i:idx+i+len(sep)] == View(sep)
 		// @ lemmaCountCanView(View(olds), View(sep), idx+i)
 		// TODO: why doesn't this hold?
 		// @ assume InRange(idx+i, 0, len(olds) - len(sep))
@@ -357,20 +186,12 @@ func Count(s, sep []byte) (res int /* @ , ghost indices set[int] @ */) {
 		// @ unfold acc(sl.Bytes(olds, 0, len(olds)), R39)
 		// @ unfold acc(sl.Bytes(sep, 0, len(sep)), R39)
 
-		// @ assert InRangeInc(i, 0, len(s) - len(sep))
-		// @ assert InRangeInc(idx, 0, len(olds) - len(sep))
-		// @ assert InRange(idx+i, 0, len(olds) - len(sep))
-
-		// @ assert forall i int  :: { i in indices }  (i in indices)  ==> (i + len(sep) < idx+i)
-		// @ assert forall i int  :: { i in indices }  (i in indices)  ==> (i + len(sep) < idx+i) || (idx+i + len(sep) < i)
 		// @ indices = indices union set[int]{idx+i}
 		// TODO: I dont understand why this doesn't hold
 		// @ assume forall i, j int  :: { i in indices, j in indices }  (i in indices) && (j in indices) ==> (i + len(sep) < j) || (j + len(sep) < i)
 
 		n++
-		// @ assert forall j int :: {&s[i + len(sep):][j]} 0 <= j && j < len(s[i + len(sep):]) ==> &s[i + len(sep):][j] == &s[j+i+len(sep)]
 		s = s[i+len(sep):]
-		// @ assert idx + i + len(sep) <= len(olds)
 
 		// @ idx += i + len(sep)
 
@@ -412,7 +233,7 @@ func ContainsRune(b []byte, r rune) bool {
 //
 // @ ensures res == -1 == (forall i int :: {View(b)[i]} 0 <= i && i < len(b) ==> View(b)[i] != c)
 func IndexByte(b []byte, c byte) (res int) {
-	return internal_bytealg__IndexByte(b, c)
+	return bytealg.IndexByte(b, c)
 }
 
 // @ preserves forall i int :: {&s[i]} 0 <= i && i < len(s) ==> acc(&s[i], R40)
@@ -451,7 +272,7 @@ func LastIndex(s, sep []byte) int {
 		return -1
 	}
 	// Rabin-Karp search from the end of the string
-	hashss, pow := internal_bytealg__HashStrRevBytes(sep)
+	hashss, pow := bytealg.HashStrRevBytes(sep)
 	last := len(s) - n
 	var h uint32
 
@@ -459,11 +280,10 @@ func LastIndex(s, sep []byte) int {
 	// @ invariant i < len(s)
 	for i := len(s) - 1; i >= last; i-- {
 		// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
-		h = h*internal_bytealg__PrimeRK + uint32(s[i])
+		h = h*bytealg.PrimeRK + uint32(s[i])
 		// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
 	}
 	// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
-	// @ assert last < len(s)
 	// @ assert forall i int :: {&s[last:][i]} 0 <= i && i < len(s[last:]) ==> &s[last:][i] == &s[i+last]
 	// @ fold acc(sl.Bytes(s[last:], 0, len(s[last:])), R40)
 	if h == hashss && Equal(s[last:], sep) {
@@ -479,7 +299,7 @@ func LastIndex(s, sep []byte) int {
 	for i := last - 1; i >= 0; i-- {
 		// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
 
-		h *= internal_bytealg__PrimeRK
+		h *= bytealg.PrimeRK
 		h += uint32(s[i])
 		h -= pow * uint32(s[i+n])
 		// @ assert forall j int :: {&s[i:i+n][j]} 0 <= j && j < len(s[i:i+n]) ==> &s[i:i+n][j] == &s[j+i]
@@ -522,30 +342,29 @@ func LastIndexByte(s []byte, c byte) int {
 // @ requires acc(sl.Bytes(s, 0, len(s)), R40)
 func IndexRune(s []byte, r rune) int {
 	switch {
-	case 0 <= r && r < unicode_utf8__RuneSelf:
+	case 0 <= r && r < utf8.RuneSelf:
 		return IndexByte(s, byte(r))
-	case r == unicode_utf8__RuneError:
+	case r == utf8.RuneError:
 		// @ invariant acc(sl.Bytes(s, 0, len(s)), R40)
 		// @ invariant i >= 0
 		for i := 0; i < len(s); {
 			// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
 			// @ assert forall j int :: {&s[i:][j]} 0 <= j && j < len(s[i:]) ==> &s[i:][j] == &s[j+i]
 			// @ fold acc(sl.Bytes(s[i:], 0, len(s[i:])), R40)
-			r1, n := unicode_utf8__DecodeRune(s[i:])
+			r1, n := utf8.DecodeRune(s[i:])
 			// @ unfold acc(sl.Bytes(s[i:], 0, len(s[i:])), R40)
 			// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
-			if r1 == unicode_utf8__RuneError {
+			if r1 == utf8.RuneError {
 				return i
 			}
 			i += n
 		}
 		return -1
-	case !unicode_utf8__ValidRune(r):
+	case !utf8.ValidRune(r):
 		return -1
 	default:
-		var b /* @ @ @ */ [unicode_utf8__UTFMax]byte
-		n := unicode_utf8__EncodeRune(b[:], r)
-		// @ assert forall i int :: {&b[:n][i]} 0 <= i && i < len(b[:n]) ==> &b[:n][i] == &b[i]
+		var b /* @ @ @ */ [utf8.UTFMax]byte
+		n := utf8.EncodeRune(b[:], r)
 		// @ fold sl.Bytes(b[:n], 0, len(b[:n]))
 		return Index(s, b[:n])
 	}
@@ -563,24 +382,24 @@ func IndexAny(s []byte, chars string) int {
 	}
 	if len(s) == 1 {
 		r := rune(s[0])
-		if r >= unicode_utf8__RuneSelf {
+		if r >= utf8.RuneSelf {
 			// search utf8.RuneError.
 			for _, r = range chars {
-				if r == unicode_utf8__RuneError {
+				if r == utf8.RuneError {
 					return 0
 				}
 			}
 			return -1
 		}
-		if internal_bytealg__IndexByteString(chars, s[0]) >= 0 {
+		if bytealg.IndexByteString(chars, s[0]) >= 0 {
 			return 0
 		}
 		return -1
 	}
 	if len(chars) == 1 {
 		r := rune(chars[0])
-		if r >= unicode_utf8__RuneSelf {
-			r = unicode_utf8__RuneError
+		if r >= utf8.RuneSelf {
+			r = utf8.RuneError
 		}
 		return IndexRune(s, r)
 	}
@@ -603,15 +422,15 @@ func IndexAny(s []byte, chars string) int {
 	var width int
 	for i := 0; i < len(s); i += width {
 		r := rune(s[i])
-		if r < unicode_utf8__RuneSelf {
-			if internal_bytealg__IndexByteString(chars, s[i]) >= 0 {
+		if r < utf8.RuneSelf {
+			if bytealg.IndexByteString(chars, s[i]) >= 0 {
 				return i
 			}
 			width = 1
 			continue
 		}
-		r, width = unicode_utf8__DecodeRune(s[i:])
-		if r != unicode_utf8__RuneError {
+		r, width = utf8.DecodeRune(s[i:])
+		if r != utf8.RuneError {
 			// r is 2 to 4 bytes
 			if len(chars) == width {
 				if chars == string(r) {
@@ -620,8 +439,8 @@ func IndexAny(s []byte, chars string) int {
 				continue
 			}
 			// Use bytealg.IndexString for performance if available.
-			if internal_bytealg__MaxLen >= width {
-				if internal_bytealg__IndexString(chars, string(r)) >= 0 {
+			if bytealg.MaxLen >= width {
+				if bytealg.IndexString(chars, string(r)) >= 0 {
 					return i
 				}
 				continue
@@ -660,26 +479,26 @@ func LastIndexAny(s []byte, chars string) int {
 	}
 	if len(s) == 1 {
 		r := rune(s[0])
-		if r >= unicode_utf8__RuneSelf {
+		if r >= utf8.RuneSelf {
 			for _, r = range chars {
-				if r == unicode_utf8__RuneError {
+				if r == utf8.RuneError {
 					return 0
 				}
 			}
 			return -1
 		}
-		if internal_bytealg__IndexByteString(chars, s[0]) >= 0 {
+		if bytealg.IndexByteString(chars, s[0]) >= 0 {
 			return 0
 		}
 		return -1
 	}
 	if len(chars) == 1 {
 		cr := rune(chars[0])
-		if cr >= unicode_utf8__RuneSelf {
-			cr = unicode_utf8__RuneError
+		if cr >= utf8.RuneSelf {
+			cr = utf8.RuneError
 		}
 		for i := len(s); i > 0; {
-			r, size := unicode_utf8__DecodeLastRune(s[:i])
+			r, size := utf8.DecodeLastRune(s[:i])
 			i -= size
 			if r == cr {
 				return i
@@ -689,16 +508,16 @@ func LastIndexAny(s []byte, chars string) int {
 	}
 	for i := len(s); i > 0; {
 		r := rune(s[i-1])
-		if r < unicode_utf8__RuneSelf {
-			if internal_bytealg__IndexByteString(chars, s[i-1]) >= 0 {
+		if r < utf8.RuneSelf {
+			if bytealg.IndexByteString(chars, s[i-1]) >= 0 {
 				return i - 1
 			}
 			i--
 			continue
 		}
-		r, size := unicode_utf8__DecodeLastRune(s[:i])
+		r, size := utf8.DecodeLastRune(s[:i])
 		i -= size
-		if r != unicode_utf8__RuneError {
+		if r != utf8.RuneError {
 			// r is 2 to 4 bytes
 			if len(chars) == size {
 				if chars == string(r) {
@@ -707,8 +526,8 @@ func LastIndexAny(s []byte, chars string) int {
 				continue
 			}
 			// Use bytealg.IndexString for performance if available.
-			if internal_bytealg__MaxLen >= size {
-				if internal_bytealg__IndexString(chars, string(r)) >= 0 {
+			if bytealg.MaxLen >= size {
+				if bytealg.IndexString(chars, string(r)) >= 0 {
 					return i
 				}
 				continue
@@ -852,14 +671,13 @@ func Fields(s []byte) [][]byte {
 		setBits |= uint8(r)
 		//gobra:endrewrite 22b50ee41a8e778fc5ba05e0b251e268cb4ea75db756138a2077c79b65c6068b
 		isSpace := int(asciiSpace[r])
-		// @ assert wasSpace & ^isSpace == b.BitAndBit(wasSpace, ^isSpace)
 		n += wasSpace & ^isSpace
 		wasSpace = isSpace
 	}
 
-	if setBits >= unicode_utf8__RuneSelf {
+	if setBits >= utf8.RuneSelf {
 		// Some runes in the input slice are not ASCII.
-		return FieldsFunc(s, unicode__IsSpace)
+		return FieldsFunc(s, unicode.IsSpace)
 	}
 
 	// ASCII fast path
@@ -904,8 +722,6 @@ func Fields(s []byte) [][]byte {
 			// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
 			continue
 		}
-		// @ assert 0 <= fieldStart && fieldStart <= i && i <= len(s)
-		// @ assert 0 <= na && na < len(a)
 		a[na] = s[fieldStart:i:i]
 		na++
 		i++
@@ -947,8 +763,8 @@ func FieldsFunc(s []byte, f func(rune) bool) [][]byte {
 	for i := 0; i < len(s); {
 		size := 1
 		r := rune(s[i])
-		if r >= unicode_utf8__RuneSelf {
-			r, size = unicode_utf8__DecodeRune(s[i:])
+		if r >= utf8.RuneSelf {
+			r, size = utf8.DecodeRune(s[i:])
 		}
 		if f(r) {
 			if start >= 0 {
@@ -1015,7 +831,6 @@ func HasPrefix(s, prefix []byte) (res bool) {
 	//gobra:end-old-code 2131f6a479f4a6519ab85f42f8e546d5fb121f7ad7c941d7a6b8daf2fa33cb68
 	if len(s) >= len(prefix) {
 		// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
-		// @ assert forall i int :: {&s[0:len(prefix)][i]} 0 <= i && i < len(s[0:len(prefix)]) ==> &s[0:len(prefix)][i] == &s[i]
 		// @ fold acc(sl.Bytes(s[0:len(prefix)], 0, len(s[0:len(prefix)])), R40)
 		res = Equal(s[0:len(prefix)], prefix)
 		// @ unfold acc(sl.Bytes(s[0:len(prefix)], 0, len(s[0:len(prefix)])), R40)
@@ -1039,7 +854,6 @@ func HasSuffix(s, suffix []byte) (res bool) {
 	//gobra:end-old-code 49653ed8abc2df0efb1fe82a8f6bccb36b7a6ca25b29b5ee7237b75d1cb8ef45
 	if len(s) >= len(suffix) {
 		// @ offset := len(s) - len(suffix)
-		// @ assert forall i int :: {&s[offset:][i]} 0 <= i && i < len(s[offset:]) ==> &s[offset:][i] == &s[i+offset]
 		// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
 		// @ assert forall i int :: {&s[len(s)-len(suffix):][i]} 0 <= i && i < len(s[len(s)-len(suffix):]) ==> &s[len(s)-len(suffix):][i] == &s[i+len(s)-len(suffix)]
 		// @ fold acc(sl.Bytes(s[len(s)-len(suffix):], 0, len(s[len(s)-len(suffix):])), R40)
@@ -1065,12 +879,12 @@ func Map(mapping func(r rune) rune, s []byte) []byte {
 	for i := 0; i < len(s); {
 		wid := 1
 		r := rune(s[i])
-		if r >= unicode_utf8__RuneSelf {
-			r, wid = unicode_utf8__DecodeRune(s[i:])
+		if r >= utf8.RuneSelf {
+			r, wid = utf8.DecodeRune(s[i:])
 		}
 		r = mapping(r)
 		if r >= 0 {
-			b = unicode_utf8__AppendRune(b, r)
+			b = utf8.AppendRune(b, r)
 		}
 		i += wid
 	}
@@ -1186,7 +1000,7 @@ func ToUpper(s []byte) []byte {
 		// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
 		c := s[i]
 		// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
-		if c >= unicode_utf8__RuneSelf {
+		if c >= utf8.RuneSelf {
 			isASCII = false
 			break
 		}
@@ -1221,7 +1035,7 @@ func ToUpper(s []byte) []byte {
 		}
 		return b
 	}
-	return Map(unicode__ToUpper, s)
+	return Map(unicode.ToUpper, s)
 }
 
 // ToLower returns a copy of the byte slice s with all Unicode letters mapped to
@@ -1235,7 +1049,7 @@ func ToLower(s []byte) (res []byte) {
 	for i := 0; i < len(s); i++ {
 		// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
 		c := s[i]
-		if c >= unicode_utf8__RuneSelf {
+		if c >= utf8.RuneSelf {
 			isASCII = false
 			// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
 			break
@@ -1270,36 +1084,36 @@ func ToLower(s []byte) (res []byte) {
 		}
 		return b
 	}
-	return Map(unicode__ToLower, s)
+	return Map(unicode.ToLower, s)
 }
 
 // ToTitle treats s as UTF-8-encoded bytes and returns a copy with all the Unicode letters mapped to their title case.
 //
 // @ preserves acc(sl.Bytes(s, 0, len(s)), R40)
-func ToTitle(s []byte) []byte { return Map(unicode__ToTitle, s) }
+func ToTitle(s []byte) []byte { return Map(unicode.ToTitle, s) }
 
 // ToUpperSpecial treats s as UTF-8-encoded bytes and returns a copy with all the Unicode letters mapped to their
 // upper case, giving priority to the special casing rules.
 //
 // @ preserves acc(sl.Bytes(s, 0, len(s)), R40)
-func ToUpperSpecial(c unicode__SpecialCase, s []byte) []byte {
-	return Map(c.unicode__ToUpper, s)
+func ToUpperSpecial(c unicode.SpecialCase, s []byte) []byte {
+	return Map(c.ToUpper, s)
 }
 
 // ToLowerSpecial treats s as UTF-8-encoded bytes and returns a copy with all the Unicode letters mapped to their
 // lower case, giving priority to the special casing rules.
 //
 // @ preserves acc(sl.Bytes(s, 0, len(s)), R40)
-func ToLowerSpecial(c unicode__SpecialCase, s []byte) []byte {
-	return Map(c.unicode__ToLower, s)
+func ToLowerSpecial(c unicode.SpecialCase, s []byte) []byte {
+	return Map(c.ToLower, s)
 }
 
 // ToTitleSpecial treats s as UTF-8-encoded bytes and returns a copy with all the Unicode letters mapped to their
 // title case, giving priority to the special casing rules.
 //
 // @ preserves acc(sl.Bytes(s, 0, len(s)), R40)
-func ToTitleSpecial(c unicode__SpecialCase, s []byte) []byte {
-	return Map(c.unicode__ToTitle, s)
+func ToTitleSpecial(c unicode.SpecialCase, s []byte) []byte {
+	return Map(c.ToTitle, s)
 }
 
 // ToValidUTF8 treats s as UTF-8-encoded bytes and returns a copy with each run of bytes
@@ -1319,7 +1133,7 @@ func ToValidUTF8(s, replacement []byte) []byte {
 		// @ unfold sl.Bytes(b, 0, len(b))
 		// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
 		c := s[i]
-		if c < unicode_utf8__RuneSelf {
+		if c < utf8.RuneSelf {
 			i++
 			invalid = false
 			b = append( /* @ R50, @ */ b, c)
@@ -1329,7 +1143,7 @@ func ToValidUTF8(s, replacement []byte) []byte {
 		}
 		// @ assert forall j int :: {&s[i:][j]} 0 <= j && j < len(s[i:]) ==> &s[i:][j] == &s[j+i]
 		// @ fold acc(sl.Bytes(s[i:], 0, len(s[i:])), R40)
-		_, wid := unicode_utf8__DecodeRune(s[i:])
+		_, wid := utf8.DecodeRune(s[i:])
 		// @ unfold acc(sl.Bytes(s[i:], 0, len(s[i:])), R40)
 		if wid == 1 {
 			i++
@@ -1344,7 +1158,6 @@ func ToValidUTF8(s, replacement []byte) []byte {
 			continue
 		}
 		invalid = false
-		// @ assert forall j int :: {&s[i:i+wid][j]} 0 <= j && j < len(s[i:i+wid]) ==> &s[i:i+wid][j] == &s[j+i]
 		b = append( /* @ R50, @ */ b, s[i:i+wid]...)
 		i += wid
 		// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
@@ -1371,11 +1184,11 @@ func isSeparator(r rune) bool {
 		return true
 	}
 	// Letters and digits are not separators
-	if unicode__IsLetter(r) || unicode__IsDigit(r) {
+	if unicode.IsLetter(r) || unicode.IsDigit(r) {
 		return false
 	}
 	// Otherwise, all we can do for now is treat spaces as separators.
-	return unicode__IsSpace(r)
+	return unicode.IsSpace(r)
 }
 
 // Title treats s as UTF-8-encoded bytes and returns a copy with all Unicode letters that begin
@@ -1399,7 +1212,7 @@ func Title(s []byte) []byte {
 		func(r rune) rune {
 			if isSeparator(prev) {
 				prev = r
-				return unicode__ToTitle(r)
+				return unicode.ToTitle(r)
 			}
 			prev = r
 			return r
@@ -1422,7 +1235,6 @@ func TrimLeftFunc(s []byte, f func(r rune) bool) (res []byte /*@, ghost idx int 
 	if i == -1 {
 		return nil // @ , -1
 	}
-	// @ assert forall j int :: {&s[i:][j]} 0 <= j && j < len(s[i:]) ==> &s[i:][j] == &s[j+i]
 	return s[i:] // @ , i
 }
 
@@ -1437,18 +1249,16 @@ func TrimLeftFunc(s []byte, f func(r rune) bool) (res []byte /*@, ghost idx int 
 func TrimRightFunc(s []byte, f func(r rune) bool) (res []byte /*@ , ghost idx int @*/) {
 	i := lastIndexFunc(s, f, false)
 	// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
-	if i >= 0 && s[i] >= unicode_utf8__RuneSelf {
+	if i >= 0 && s[i] >= utf8.RuneSelf {
 		// @ assert forall j int :: {&s[i:][j]} 0 <= j && j < len(s[i:]) ==> &s[i:][j] == &s[j+i]
 		// @ fold acc(sl.Bytes(s[i:], 0, len(s[i:])), R40)
-		_, wid := unicode_utf8__DecodeRune(s[i:])
+		_, wid := utf8.DecodeRune(s[i:])
 		// @ unfold acc(sl.Bytes(s[i:], 0, len(s[i:])), R40)
 		i += wid
 	} else {
 		i++
 	}
 	// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
-	// @ assert forall j int :: {&s[0:i][j]} 0 <= j && j < len(s[0:i]) ==> &s[0:i][j] == &s[j]
-	// @ assert acc(sl.Bytes(s, 0, len(s)), R40)
 	return s[0:i] // @ , i
 }
 
@@ -1517,8 +1327,8 @@ func indexFunc(s []byte, f func(r rune) bool, truth bool) (res int) {
 	for start < len(s) {
 		wid := 1
 		r := rune(s[start])
-		if r >= unicode_utf8__RuneSelf {
-			r, wid = unicode_utf8__DecodeRune(s[start:])
+		if r >= utf8.RuneSelf {
+			r, wid = utf8.DecodeRune(s[start:])
 		}
 		if f(r) == truth {
 			return start
@@ -1540,8 +1350,8 @@ func indexFunc(s []byte, f func(r rune) bool, truth bool) (res int) {
 func lastIndexFunc(s []byte, f func(r rune) bool, truth bool) (res int) {
 	for i := len(s); i > 0; {
 		r, size := rune(s[i-1]), 1
-		if r >= unicode_utf8__RuneSelf {
-			r, size = unicode_utf8__DecodeLastRune(s[0:i])
+		if r >= utf8.RuneSelf {
+			r, size = utf8.DecodeLastRune(s[0:i])
 		}
 		i -= size
 		if f(r) == truth {
@@ -1570,7 +1380,7 @@ type asciiSet [8]uint32
 //gobra:cont func makeASCIISet(chars string) (as asciiSet, ok bool) {
 //gobra:cont 	for i := 0; i < len(chars); i++ {
 //gobra:cont 		c := chars[i]
-//gobra:cont 		if c >= unicode_utf8__RuneSelf {
+//gobra:cont 		if c >= utf8.RuneSelf {
 //gobra:cont 			return as, false
 //gobra:cont 		}
 //gobra:cont 		as[c/32] |= 1 << (c % 32)
@@ -1581,7 +1391,7 @@ type asciiSet [8]uint32
 func makeASCIISet(chars string) (asc asciiSet, ok bool) {
 	for i := 0; i < len(chars); i++ {
 		c := chars[i]
-		if c >= unicode_utf8__RuneSelf {
+		if c >= utf8.RuneSelf {
 			return asc, false
 		}
 		asc[c/32] |= 1 << (c % 32)
@@ -1630,7 +1440,7 @@ func Trim(s []byte, cutset string) []byte {
 	if cutset == "" {
 		return s
 	}
-	if len(cutset) == 1 && cutset[0] < unicode_utf8__RuneSelf {
+	if len(cutset) == 1 && cutset[0] < utf8.RuneSelf {
 		return trimLeftByte(trimRightByte(s, cutset[0]), cutset[0])
 	}
 	//gobra:rewrite 329e1a6db3db57138d21cb1ecb7578a2c511353b2a38ea13e4d95797885d2652
@@ -1655,7 +1465,7 @@ func TrimLeft(s []byte, cutset string) []byte {
 	if cutset == "" {
 		return s
 	}
-	if len(cutset) == 1 && cutset[0] < unicode_utf8__RuneSelf {
+	if len(cutset) == 1 && cutset[0] < utf8.RuneSelf {
 		return trimLeftByte(s, cutset[0])
 	}
 	//gobra:rewrite 02e8fa567eed1a77793874c0a530f453e89ef951a7e1262e8af97f1d29b0e426
@@ -1720,18 +1530,16 @@ func trimLeftUnicode(s []byte, cutset string) []byte {
 	for len(s) > 0 {
 		// @ unfold acc(sl.Bytes(olds, 0, len(olds)), R40)
 		// @ assert forall j int :: {&olds[idx:][j]} 0 <= j && j < len(olds[idx:]) ==> &olds[idx:][j] == &olds[j+idx]
-		// @ assert forall j int :: {&olds[idx:][j]} 0 <= j && j < len(olds[idx:]) ==> &olds[idx:][j] == &s[j]
 		r, n := rune(s[0]), 1
-		if r >= unicode_utf8__RuneSelf {
+		if r >= utf8.RuneSelf {
 			// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
-			r, n = unicode_utf8__DecodeRune(s)
+			r, n = utf8.DecodeRune(s)
 			// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
 		}
 		if !containsRune(cutset, r) {
 			// @ fold acc(sl.Bytes(olds, 0, len(olds)), R40)
 			break
 		}
-		// @ assert forall i int :: {&s[n:][i]} 0 <= i && i < len(s[n:]) ==> &s[n:][i] == &s[i+n]
 		s = s[n:]
 		// @ idx += n
 		// @ fold acc(sl.Bytes(olds, 0, len(olds)), R40)
@@ -1753,7 +1561,7 @@ func TrimRight(s []byte, cutset string) []byte {
 	if len(s) == 0 || cutset == "" {
 		return s
 	}
-	if len(cutset) == 1 && cutset[0] < unicode_utf8__RuneSelf {
+	if len(cutset) == 1 && cutset[0] < utf8.RuneSelf {
 		return trimRightByte(s, cutset[0])
 	}
 	//gobra:rewrite 6b32179dcd0024634836ba05365a9b23b3c72a83392c21e0d427fcbef33f3335
@@ -1781,8 +1589,6 @@ func trimRightByte(s []byte, c byte) []byte {
 	// @ invariant acc(sl.Bytes(olds, 0, len(olds)), R40)
 	for len(s) > 0 && /* @ unfolding acc(sl.Bytes(olds, 0, len(olds)), R40) in @ */ s[len(s)-1] == c {
 		// @ unfold acc(sl.Bytes(olds, 0, len(olds)), R40)
-		// @ assert forall j int :: {&olds[0:idx][j]} 0 <= j && j < len(olds[0:idx]) ==> &olds[0:idx][j] == &olds[j]
-		// @ assert forall j int :: {&olds[0:idx][j]} 0 <= j && j < len(olds[0:idx]) ==> &olds[0:idx][j] == &s[j]
 		// @ idx = len(s)-1
 		s = s[:len(s)-1]
 		// @ fold acc(sl.Bytes(olds, 0, len(olds)), R40)
@@ -1809,8 +1615,6 @@ func trimRightASCII(s []byte, asc *asciiSet) []byte {
 	// @ invariant acc(asc, R40)
 	for len(s) > 0 {
 		// @ unfold acc(sl.Bytes(olds, 0, len(olds)), R40)
-		// @ assert forall j int :: {&olds[0:idx][j]} 0 <= j && j < len(olds[0:idx]) ==> &olds[0:idx][j] == &olds[j]
-		// @ assert forall j int :: {&olds[0:idx][j]} 0 <= j && j < len(olds[0:idx]) ==> &olds[0:idx][j] == &s[j]
 		if !asc.contains(s[len(s)-1]) {
 			// @ fold acc(sl.Bytes(olds, 0, len(olds)), R40)
 			//gobra:endrewrite 8c5e716b23a66f72365a9505e211ec2676a538b1b7f603a6a87fa45a9448fab6
@@ -1832,17 +1636,14 @@ func trimRightUnicode(s []byte, cutset string) []byte {
 	// @ invariant acc(sl.Bytes(olds, 0, len(olds)), R40)
 	for len(s) > 0 {
 		// @ unfold acc(sl.Bytes(olds, 0, len(olds)), R40)
-		// @ assert forall j int :: {olds[0:idx][j]} 0 <= j && j < len(olds[0:idx]) ==> &olds[0:idx][j] == &olds[j]
-		// @ assert forall j int :: {&olds[0:idx][j]} 0 <= j && j < len(olds[0:idx]) ==> &olds[0:idx][j] == &s[j]
 		r, n := rune(s[len(s)-1]), 1
-		if r >= unicode_utf8__RuneSelf {
-			r, n = unicode_utf8__DecodeLastRune(s)
+		if r >= utf8.RuneSelf {
+			r, n = utf8.DecodeLastRune(s)
 		}
 		if !containsRune(cutset, r) {
 			// @ fold acc(sl.Bytes(olds, 0, len(olds)), R40)
 			break
 		}
-		// @ assert n <= len(s)
 		// @ idx = len(s)-n
 		s = s[:len(s)-n]
 		// @ fold acc(sl.Bytes(olds, 0, len(olds)), R40)
@@ -1862,15 +1663,15 @@ func TrimSpace(s []byte) (res []byte) {
 	for ; start < len(s); start++ {
 		// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
 		c := s[start]
-		if c >= unicode_utf8__RuneSelf {
+		if c >= utf8.RuneSelf {
 			// If we run into a non-ASCII byte, fall back to the
 			// slower unicode-aware method on the remaining bytes
 			//gobra:rewrite b208b2fc84fdec6980efcf6edd6d2e889e1c30b2f474d6c0f45409e7fcac7947
-			//gobra:cont 			return TrimFunc(s[start:], unicode__IsSpace)
+			//gobra:cont 			return TrimFunc(s[start:], unicode.IsSpace)
 			//gobra:end-old-code b208b2fc84fdec6980efcf6edd6d2e889e1c30b2f474d6c0f45409e7fcac7947
 			// @ assert forall i int :: {&s[start:][i]} 0 <= i && i < len(s[start:]) ==> &s[start:][i] == &s[i+start]
 			// @ fold acc(sl.Bytes(s[start:], 0, len(s[start:])), R40)
-			res = TrimFunc(s[start:], unicode__IsSpace)
+			res = TrimFunc(s[start:], unicode.IsSpace)
 			// @ unfold acc(sl.Bytes(s[start:], 0, len(s[start:])), R40)
 			// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
 			return res
@@ -1883,7 +1684,6 @@ func TrimSpace(s []byte) (res []byte) {
 		}
 		// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
 	}
-	// @ assert start <= len(s)
 
 	// Now look for the first ASCII non-space byte from the end
 	stop := len(s)
@@ -1898,13 +1698,13 @@ func TrimSpace(s []byte) (res []byte) {
 		// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
 		c := s[stop-1]
 		// @ b.ByteValue(c)
-		if c >= unicode_utf8__RuneSelf {
+		if c >= utf8.RuneSelf {
 			// @ assert forall i int :: {&s[start:stop][i]} 0 <= i && i < len(s[start:stop]) ==> &s[start:stop][i] == &s[i+start]
 			//gobra:rewrite a3f298cff5d32351f7602fe0f87e35604223b1ccb74508953fa6c004bb35b87a
-			//gobra:cont 			return TrimFunc(s[start:stop], unicode__IsSpace)
+			//gobra:cont 			return TrimFunc(s[start:stop], unicode.IsSpace)
 			//gobra:end-old-code a3f298cff5d32351f7602fe0f87e35604223b1ccb74508953fa6c004bb35b87a
 			// @ fold acc(sl.Bytes(s[start:stop], 0, len(s[start:stop])), R40)
-			res = TrimFunc(s[start:stop], unicode__IsSpace)
+			res = TrimFunc(s[start:stop], unicode.IsSpace)
 			// @ unfold acc(sl.Bytes(s[start:stop], 0, len(s[start:stop])), R40)
 			// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
 			return res
@@ -1924,8 +1724,6 @@ func TrimSpace(s []byte) (res []byte) {
 		// returning nil instead of empty slice if all spaces.
 		return nil
 	}
-	// @ assert 0 <= start && start <= stop && stop <= len(s)
-	// @ assert forall i int :: {&s[start:stop][i]} 0 <= i && i < len(s[start:stop]) ==> &s[start:stop][i] == &s[i+start]
 	return s[start:stop]
 }
 
@@ -1936,28 +1734,28 @@ func TrimSpace(s []byte) (res []byte) {
 //
 // @ ensures sl.Runes(res, 0, len(res))
 //
-// @ ensures sl.ViewRunes(res) == unicode_utf8__Codepoints(s)
+// @ ensures sl.ViewRunes(res) == utf8.Codepoints(s)
 func Runes(s []byte) (res []rune) {
 	//gobra:rewrite 5aab27295fdb5ccf8c220250bc5b75224bfd961a47a286501fad584575d50cda
-	//gobra:cont 	t := make([]rune, unicode_utf8__RuneCount(s))
+	//gobra:cont 	t := make([]rune, utf8.RuneCount(s))
 	//gobra:end-old-code 5aab27295fdb5ccf8c220250bc5b75224bfd961a47a286501fad584575d50cda
-	tLength /* @, indices @*/ := unicode_utf8__RuneCount(s)
+	tLength /* @, indices @*/ := utf8.RuneCount(s)
 	t := make([]rune, tLength)
 	//gobra:endrewrite 5aab27295fdb5ccf8c220250bc5b75224bfd961a47a286501fad584575d50cda
 	i := 0
 
 	// @ ghost olds := s
 	// @ ghost idx := 0
-	// @ ghost codepoints := unicode_utf8__Codepoints(s)
+	// @ ghost codepoints := utf8.Codepoints(s)
 	// @ fold sl.Runes(t, 0, len(t))
 	// @ invariant i <= idx
 	// @ invariant 0 <= idx && idx <= len(olds)
 	// @ invariant acc(sl.Bytes(olds, 0, len(olds)), R40)
 	// @ invariant olds[idx:] === s
 	// @ invariant sl.Runes(t, 0, len(t))
-	// @ invariant unicode_utf8__Codepoints(s) == codepoints[i:]
+	// @ invariant utf8.Codepoints(s) == codepoints[i:]
 	// @ invariant 0 <= i && i <= len(t)
-	// @ invariant i == len(t) - len(unicode_utf8__Codepoints(s))
+	// @ invariant i == len(t) - len(utf8.Codepoints(s))
 	// @ invariant len(s) > 0 ==> i < len(t)
 	// @ invariant sl.ViewRunes(t)[:i] == codepoints[:i]
 	// @ decreases len(s)
@@ -1965,17 +1763,13 @@ func Runes(s []byte) (res []rune) {
 		// @ unfold sl.Runes(t, 0, len(t))
 		// @ unfold acc(sl.Bytes(olds, 0, len(olds)), R40)
 		// @ assert forall j int :: {&olds[idx:][j]} 0 <= j && j < len(olds[idx:]) ==> &olds[idx:][j] == &olds[j+idx]
-		// @ assert forall j int :: {&olds[idx:][j]} 0 <= j && j < len(olds[idx:]) ==> &olds[idx:][j] == &s[j]
 		// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
-		r, l := unicode_utf8__DecodeRune(s)
-		// @ assert codepoints[i] == r
+		r, l := utf8.DecodeRune(s)
 		// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
 		t[i] = r
 		i++
-		// @ assert forall i int :: {s[l:][i]} 0 <= i && i < len(s[l:]) ==> &s[l:][i] == &s[i+l]
 		s = s[l:]
 		// @ idx += l
-		// @ assert i <= idx
 		// @ fold acc(sl.Bytes(olds, 0, len(olds)), R40)
 		// @ fold sl.Runes(t, 0, len(t))
 	}
@@ -2030,7 +1824,6 @@ func Replace(s, oldval, newval []byte, n int) (res []byte) {
 	//gobra:rewrite c787ef8de608ddf205718721d556dee5a732bac8dce3fa92ce9f2266fe7bc2a1
 	//gobra:cont 	t := make([]byte, len(s)+n*(len(new)-len(old)))
 	//gobra:end-old-code c787ef8de608ddf205718721d556dee5a732bac8dce3fa92ce9f2266fe7bc2a1
-	// @ assert len(s) >= n*(len(oldval) - len(newval))
 	t := make([]byte, len(s)+n*(len(newval)-len(oldval)))
 	//gobra:endrewrite c787ef8de608ddf205718721d556dee5a732bac8dce3fa92ce9f2266fe7bc2a1
 	w := 0
@@ -2043,7 +1836,7 @@ func Replace(s, oldval, newval []byte, n int) (res []byte) {
 		if len(oldval) == 0 {
 			//gobra:endrewrite 945fbe50b78d9a29bb15d5eaedeaf126427abf5df5d10795b8c3eae67c53cab9
 			if i > 0 {
-				_, wid := unicode_utf8__DecodeRune(s[start:])
+				_, wid := utf8.DecodeRune(s[start:])
 				j += wid
 			}
 		} else {
@@ -2102,7 +1895,7 @@ func EqualFold(s, t []byte) bool /* {
 	for ; i < len(s) && i < len(t); i++ {
 		sr := s[i]
 		tr := t[i]
-		if sr|tr >= unicode_utf8__RuneSelf {
+		if sr|tr >= utf8.RuneSelf {
 			goto hasUnicode
 		}
 
@@ -2130,16 +1923,16 @@ hasUnicode:
 	for len(s) != 0 && len(t) != 0 {
 		// Extract first rune from each.
 		var sr, tr rune
-		if s[0] < unicode_utf8__RuneSelf {
+		if s[0] < utf8.RuneSelf {
 			sr, s = rune(s[0]), s[1:]
 		} else {
-			r, size := unicode_utf8__DecodeRune(s)
+			r, size := utf8.DecodeRune(s)
 			sr, s = r, s[size:]
 		}
-		if t[0] < unicode_utf8__RuneSelf {
+		if t[0] < utf8.RuneSelf {
 			tr, t = rune(t[0]), t[1:]
 		} else {
-			r, size := unicode_utf8__DecodeRune(t)
+			r, size := utf8.DecodeRune(t)
 			tr, t = r, t[size:]
 		}
 
@@ -2155,7 +1948,7 @@ hasUnicode:
 			tr, sr = sr, tr
 		}
 		// Fast check for ASCII.
-		if tr < unicode_utf8__RuneSelf {
+		if tr < utf8.RuneSelf {
 			// ASCII only, sr/tr must be upper/lower case
 			if 'A' <= sr && sr <= 'Z' && tr == sr+'a'-'A' {
 				continue
@@ -2165,9 +1958,9 @@ hasUnicode:
 
 		// General case. SimpleFold(x) returns the next equivalent rune > x
 		// or wraps around to smaller values.
-		r := unicode__SimpleFold(sr)
+		r := unicode.SimpleFold(sr)
 		for r != sr && r < tr {
-			r = unicode__SimpleFold(r)
+			r = unicode.SimpleFold(r)
 		}
 		if r == tr {
 			continue
@@ -2219,13 +2012,13 @@ func Index(s, sep []byte) (res int) {
 		return -1
 	case n > len(s):
 		return -1
-	case n <= internal_bytealg__MaxLen:
+	case n <= bytealg.MaxLen:
 		// Use brute force when s and sep both are small
-		if len(s) <= internal_bytealg__MaxBruteForce {
+		if len(s) <= bytealg.MaxBruteForce {
 			//gobra:rewrite 995fa64579b51d79f9f879d5f8e3762d24f4fdca91658781b8cae477bd10eba4
-			//gobra:cont 			return internal_bytealg__Index(s, sep)
+			//gobra:cont 			return bytealg.Index(s, sep)
 			//gobra:end-old-code 995fa64579b51d79f9f879d5f8e3762d24f4fdca91658781b8cae477bd10eba4
-			res = internal_bytealg__Index(s, sep)
+			res = bytealg.Index(s, sep)
 			// @ assume res != -1 ==> forall i int :: {View(s)[i:i+len(sep)]} 0 <= i && i < res ==> View(s)[i:i+len(sep)] != View(sep)
 			return res
 			//gobra:endrewrite 995fa64579b51d79f9f879d5f8e3762d24f4fdca91658781b8cae477bd10eba4
@@ -2284,10 +2077,10 @@ func Index(s, sep []byte) (res int) {
 			fails++
 			i++
 			// Switch to bytealg.Index when IndexByte produces too many false positives.
-			if fails > internal_bytealg__Cutover(i) {
+			if fails > bytealg.Cutover(i) {
 				// @ assert forall j int :: {&s[i:][j]} 0 <= j && j < len(s[i:]) ==> &s[i:][j] == &s[j+i]
 				// @ fold acc(sl.Bytes(s[i:], 0, len(s[i:])), R40)
-				r := internal_bytealg__Index(s[i:], sep)
+				r := bytealg.Index(s[i:], sep)
 				// @ unfold acc(sl.Bytes(s[i:], 0, len(s[i:])), R40)
 				if r >= 0 {
 					// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
@@ -2361,7 +2154,7 @@ func Index(s, sep []byte) (res int) {
 			// This code does not take that effect into account.
 			// @ assert forall j int :: {&s[i:][j]} 0 <= j && j < len(s[i:]) ==> &s[i:][j] == &s[j+i]
 			// @ fold acc(sl.Bytes(s[i:], 0, len(s[i:])), R40)
-			j := internal_bytealg__IndexRabinKarpBytes(s[i:], sep)
+			j := bytealg.IndexRabinKarpBytes(s[i:], sep)
 			// @ unfold acc(sl.Bytes(s[i:], 0, len(s[i:])), R40)
 			if j < 0 {
 				// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
@@ -2373,7 +2166,6 @@ func Index(s, sep []byte) (res int) {
 		}
 		// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
 	}
-	// @ assert forall j int :: {vs[j:j+len(sep)]} 0 <= j && j + len(sep) <= len(s) ==> vs[j:j+len(sep)] != vsep
 	return -1
 }
 

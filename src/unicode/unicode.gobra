@@ -1,0 +1,24 @@
+//+gobra
+
+package unicode
+
+
+func IsDigit(r rune) bool
+func IsLetter(r rune) bool
+func IsSpace(r rune) bool
+
+type d [4]rune // to make the CaseRanges text shorter
+type CaseRange struct {
+	Lo    uint32
+	Hi    uint32
+	Delta d
+}
+type SpecialCase []CaseRange
+
+func ToUpper(r rune) rune
+func ToLower(r rune) rune
+func ToTitle(r rune) rune
+func (special SpecialCase) ToUpper(r rune) rune
+func (special SpecialCase) ToTitle(r rune) rune
+func (special SpecialCase) ToLower(r rune) rune
+func SimpleFold(r rune) rune

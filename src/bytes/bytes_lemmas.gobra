@@ -8,6 +8,7 @@ import (
    sl "verification/utils/slices"
    seqs "verification/utils/seqs"
    sets "verification/utils/sets"
+   . "bytes/spec"
 )
 
 
@@ -87,3 +88,14 @@ func lemmaCountAux(s, sep seq[byte], indices set[int], idx int) {
 	assert forall j int :: { j in indices }{ s[j:j+len(sep)] } !(j in indices) && InRangeInc(j, idx, len(s) - len(sep)) && !SetContainsInRange(indices, j-len(sep), j) ==> s[j:j+len(sep)] != sep
 	assume forall j int :: { j in indices }{ s[j:j+len(sep)] } !(j in indices) && InRangeInc(j, 0, len(s) - len(sep)) && !SetContainsInRange(indices, j-len(sep), j) ==> s[j:j+len(sep)] != sep
 }
+
+ghost
+requires 0 < p
+requires acc(sl.Bytes(a, 0, len(a)), p)
+requires acc(sl.Bytes(b, 0, len(b)), p)
+requires r == ((unfolding acc(sl.Bytes(a, 0, len(a)), p) in string(a)) == (unfolding acc(sl.Bytes(b, 0, len(b)), p) in string(b)))
+ensures acc(sl.Bytes(a, 0, len(a)), p)
+ensures acc(sl.Bytes(b, 0, len(b)), p)
+ensures r == (View(a) == View(b))
+decreases
+func stringEqualsImplViewEquals(r bool, a, b []byte, p perm)
