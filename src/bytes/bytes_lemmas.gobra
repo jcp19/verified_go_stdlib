@@ -49,6 +49,12 @@ func lemmaSpecRepeat_1(b seq[byte]) {
 
 ghost
 requires n >= 0
+ensures b ++ SpecRepeat(b, n) == SpecRepeat(b, n) ++ b
+decreases
+func axiomSpecRepeatCommutative(b seq[byte], n int)
+
+ghost
+requires n >= 0
 ensures SpecRepeat(b, 2 * n) == SpecRepeat(b, n) ++ SpecRepeat(b, n)
 decreases _
 func lemmaSpecRepeat_2n(b seq[byte], n int) {
@@ -56,25 +62,20 @@ func lemmaSpecRepeat_2n(b seq[byte], n int) {
 		assert SpecRepeat(b, n) == b ++ SpecRepeat(b, n - 1)
 		assert SpecRepeat(b, n) ++ SpecRepeat(b, n) == b ++ SpecRepeat(b, n - 1) ++ b ++ SpecRepeat(b, n - 1)
 		// order of repeating doesn't matter because it's always the same element that is repeated
-		assume b ++ SpecRepeat(b, n - 1) ++ b ++ SpecRepeat(b, n - 1) == b ++ b ++ SpecRepeat(b, n - 1) ++ SpecRepeat(b, n - 1)
+		assert b ++ SpecRepeat(b, n - 1) ++ b ++ SpecRepeat(b, n - 1) == b ++ (SpecRepeat(b, n - 1) ++ b) ++ SpecRepeat(b, n - 1)
+		axiomSpecRepeatCommutative(b, n - 1)
+		assert b ++ (SpecRepeat(b, n - 1) ++ b) ++ SpecRepeat(b, n - 1) == b ++ (b ++ SpecRepeat(b, n - 1)) ++ SpecRepeat(b, n - 1)
+		assert b ++ SpecRepeat(b, n - 1) ++ b ++ SpecRepeat(b, n - 1) == b ++ b ++ SpecRepeat(b, n - 1) ++ SpecRepeat(b, n - 1)
 		lemmaSpecRepeat_2n(b, n - 1)
 		assert SpecRepeat(b, n - 1) ++ SpecRepeat(b, n - 1) == SpecRepeat(b, 2 * (n - 1))
 		assert SpecRepeat(b, 2 * n - 1) == b ++ SpecRepeat(b, n - 1) ++ SpecRepeat(b, n - 1)
 		assert SpecRepeat(b, 2 * n) == b ++ b ++ SpecRepeat(b, n - 1) ++ SpecRepeat(b, n - 1)
 	} else {
-		TODO()
+		assert SpecRepeat(b, 2 * 0) == SpecRepeat(b, 0) ++ SpecRepeat(b, 0)
 	}
 }
 
 // Count
-
-ghost
-requires s[i:i+len(sep)] == sep
-ensures InRangeInc(i, 0, len(s) - len(sep))
-decreases
-func lemmaCountCanView(s seq[byte], sep seq[byte], i int) {
-	TODO()
-}
 
 ghost
 requires InRangeInc(idx, 0, len(s))
