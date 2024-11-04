@@ -12,6 +12,20 @@ import (
 )
 
 
+ghost
+requires 0 < p1 && 0 < p2
+requires 0 <= start && start <= end && end <= len(s)
+preserves acc(sl.Bytes(s, 0, len(s)), p1)
+preserves acc(sl.Bytes(s[start:end], 0, len(s[start:end])), p2)
+ensures View(s[start:end]) == View(s)[start:end]
+trusted
+decreases _
+func lemmaViewSlice(s []byte, start, end int, p1, p2 perm) {
+	TODO()
+}
+
+
+
 // Repeat
 
 
@@ -75,6 +89,9 @@ func lemmaSpecRepeat_2n(b seq[byte], n int) {
 	}
 }
 
+
+
+
 // Count
 
 ghost
@@ -100,3 +117,62 @@ ensures acc(sl.Bytes(b, 0, len(b)), p)
 ensures r == (View(a) == View(b))
 decreases
 func stringEqualsImplViewEquals(r bool, a, b []byte, p perm)
+
+// index
+
+ghost
+requires 2 <= len(s)
+requires t == len(s) - len(sep) + 1
+requires 0 <= i && i+1 <= t && t <= len(s)
+requires i < t
+requires 0 <= o && o < t-i-1
+requires s[i] != sep[0]
+requires forall j int :: { s[j:j+len(sep)] } 0 <= j && j < i ==> s[j:j+len(sep)] != sep
+requires forall j int :: {s[i+1:t][j]} 0 <= j && j < o ==> s[i+1:t][j] != sep[0]
+ensures  forall j int :: { s[j:j+len(sep)] } 0 <= j && j < i+o+1 ==> s[j:j+len(sep)] != sep
+decreases
+func lemmaIndexIndexByteIsNotPrefix(s, sep seq[byte], i, t, o int) {
+
+	invariant forall j int :: {s[i+1:t][j]} 0 <= j && j < o ==> s[i+1:t][j] != sep[0]
+	invariant i+1 <= idx
+	invariant forall j int :: { s[j:j+len(sep)] } 0 <= j && j < idx ==> s[j:j+len(sep)] != sep
+	decreases _
+	for idx := i+1; idx < i+o+1 ; idx++ {
+		assert s[idx] == s[i+1:t][idx - (i+1)]
+		assert s[idx] != sep[0]
+		assert s[idx:idx+len(sep)] != sep
+	}
+
+}
+
+ghost
+requires 2 <= len(s)
+requires t == len(s) - len(sep) + 1
+requires 0 <= i && i+1 <= t && t <= len(s)
+requires i < t
+requires s[i] != sep[0]
+requires forall j int :: { s[j:j+len(sep)] } 0 <= j && j < i ==> s[j:j+len(sep)] != sep
+requires forall j int :: { s[i+1:t][j] } 0 <= j && j < len(s[i+1:t]) ==> s[i+1:t][j] != sep[0]
+ensures  forall j int :: { s[j:j+len(sep)] } 0 <= j && j < t ==> s[j:j+len(sep)] != sep
+decreases
+func lemmaIndexIndexByteNotFound(s, sep seq[byte], i, t int) {
+	invariant i+1 <= idx
+	invariant forall j int :: { s[j:j+len(sep)] } 0 <= j && j < idx ==> s[j:j+len(sep)] != sep
+	decreases _
+	for idx := i+1; idx < t; idx++ {
+
+		assert s[idx] == s[i+1:t][idx - (i+1)]
+		assert s[idx] != sep[0]
+		assert s[idx:idx+len(sep)] != sep
+	}
+
+}
+
+ghost
+requires forall j int :: { s[j:j+len(sep)] } 0 <= j && j < a ==> s[j:j+len(sep)] != sep
+requires forall j int :: { s[j:j+len(sep)] } a <= j && j < b ==> s[j:j+len(sep)] != sep
+ensures  forall j int :: { s[j:j+len(sep)] } 0 <= j && j < b ==> s[j:j+len(sep)] != sep
+decreases
+func lemmaIndexAdvance(s, sep seq[byte], a, b int) {
+
+}

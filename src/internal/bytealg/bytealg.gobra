@@ -21,11 +21,12 @@ const MaxBruteForce = 64
 func Cutover(n int) int
 
 requires 2 <= len(b) && len(b) <= MaxLen
-preserves acc(sl.Bytes(a, 0, len(a)), R40)
-preserves acc(sl.Bytes(b, 0, len(b)), R40)
+preserves acc(sl.Bytes(a, 0, len(a)), R45)
+preserves acc(sl.Bytes(b, 0, len(b)), R45)
 ensures 0 <= res && res + len(b) <= len(a)
 ensures res != -1 ==> View(a)[res:res+len(b)] == View(b)
 ensures res == -1 ==> !exists i int :: {View(a)[i:i+len(b)]} View(a)[i:i+len(b)] == View(b)
+ensures res != -1 ==> forall i int :: {View(a)[i:i+len(b)]} 0 <= i && i < res ==> View(a)[i:i+len(b)] != View(b)
 decreases _
 func Index(a, b []byte) (res int)
 
@@ -55,5 +56,6 @@ preserves acc(sl.Bytes(sep, 0, len(sep)), R50)
 ensures 0 <= res && res + len(sep) <= len(s)
 ensures res != -1 ==> View(s)[res:res+len(sep)] == View(sep)
 ensures res == -1 ==> !exists i int :: {View(s)[i:i+len(sep)]} View(s)[i:i+len(sep)] == View(sep)
+ensures res != -1 ==> forall i int :: {View(s)[i:i+len(sep)]} 0 <= i && i < res ==> View(s)[i:i+len(sep)] != View(sep)
 decreases _
 func IndexRabinKarpBytes(s, sep []byte) (res int)
