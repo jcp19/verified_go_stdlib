@@ -96,14 +96,14 @@ func TODO()
 
 ghost
 ensures res == (low <= i && i < high)
-decreases _
+decreases
 pure func InRange(i, low, high int) (res bool) {
 	return low <= i && i < high
 }
 
 ghost
 ensures res == (low <= i && i <= high)
-decreases _
+decreases
 pure func InRangeInc(i, low, high int) (res bool) {
 	return low <= i && i <= high
 }

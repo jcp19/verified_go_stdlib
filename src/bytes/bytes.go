@@ -30,7 +30,7 @@ import (
 //
 // @ ensures res == ( View(a) == View(b) )
 //
-// @ decreases _
+// @ decreases
 func Equal(a, b []byte) (res bool) {
 	// Neither cmd/compile nor gccgo allocates for these string conversions.
 	//gobra:rewrite bb601b0360eb4c70921af43549f6965f5b00ec78f7f6b39abd84a83639cd2a48
@@ -49,7 +49,7 @@ func Equal(a, b []byte) (res bool) {
 //
 // @ preserves acc(sl.Bytes(b, 0, len(b)), R40)
 //
-// @ decreases _
+// @ decreases
 func Compare(a, b []byte) int {
 	return bytealg.Compare(a, b)
 }
@@ -62,7 +62,7 @@ func Compare(a, b []byte) int {
 // @ ensures forall i int :: {&res[i]} 0 <= i && i < len(res) ==> acc(&res[i])
 // @ trusted // TODO
 //
-// @ decreases _
+// @ decreases
 func explode(s []byte, n int) (res [][]byte) {
 	if n <= 0 || n > len(s) {
 		n = len(s)
@@ -103,7 +103,7 @@ func explode(s []byte, n int) (res [][]byte) {
 //
 // @ ensures len(sep) == 0 ==> forall i int :: {i in indices} i in indices ==> 0 <= i && i <= len(s)
 //
-// @ decreases _
+// @ decreases
 func Count(s, sep []byte) (res int /* @ , ghost indices set[int] @ */) {
 	// special case
 	if len(sep) == 0 {
@@ -205,7 +205,7 @@ func Count(s, sep []byte) (res int /* @ , ghost indices set[int] @ */) {
 //
 // @ ensures res == ( exists i int :: { View(b)[i:i+len(subslice)] } 0 <= i && i + len(subslice) <= len(b) && View(b)[i:i+len(subslice)] == View(subslice) )
 //
-// @ decreases _
+// @ decreases
 func Contains(b, subslice []byte) (res bool) {
 	return Index(b, subslice) != -1
 }
@@ -232,7 +232,7 @@ func ContainsRune(b []byte, r rune) bool {
 //
 // @ ensures res == -1 == (forall i int :: {View(b)[i]} 0 <= i && i < len(b) ==> View(b)[i] != c)
 //
-// @ decreases _
+// @ decreases
 func IndexByte(b []byte, c byte) (res int) {
 	return bytealg.IndexByte(b, c)
 }
@@ -241,10 +241,11 @@ func IndexByte(b []byte, c byte) (res int) {
 //
 // @ preserves acc(s, R40)
 //
-// @ decreases _
+// @ decreases
 func indexBytePortable(s []byte, c byte) int {
 	// @ invariant forall j int :: {&s[j]} 0 <= j && j < len(s) ==> acc(&s[j], R40)
 	// @ invariant acc(s, R40)
+	// @ decreases len(s) - i0
 	for i, b := range s /* @ with i0 @ */ {
 		if b == c {
 			return i
@@ -259,7 +260,7 @@ func indexBytePortable(s []byte, c byte) int {
 //
 // @ preserves acc(sl.Bytes(sep, 0, len(sep)), R40)
 //
-// @ decreases _
+// @ decreases
 func LastIndex(s, sep []byte) int {
 	n := len(sep)
 	switch {
@@ -283,6 +284,8 @@ func LastIndex(s, sep []byte) int {
 
 	// @ invariant acc(sl.Bytes(s, 0, len(s)), R40)
 	// @ invariant i < len(s)
+	// @ invariant i - last >= -1
+	// @ decreases i - last
 	for i := len(s) - 1; i >= last; i-- {
 		// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
 		h = h*bytealg.PrimeRK + uint32(s[i])
@@ -301,6 +304,8 @@ func LastIndex(s, sep []byte) int {
 	// @ invariant acc(sl.Bytes(s, 0, len(s)), R40)
 	// @ invariant acc(sl.Bytes(sep, 0, len(sep)), R40)
 	// @ invariant i < last && last < len(s)
+	// @ invariant i >= -1
+	// @ decreases i
 	for i := last - 1; i >= 0; i-- {
 		// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
 
@@ -324,7 +329,7 @@ func LastIndex(s, sep []byte) int {
 //
 // @ preserves acc(sl.Bytes(s, 0, len(s)), R40)
 //
-// @ decreases _
+// @ decreases
 func LastIndexByte(s []byte, c byte) int {
 	// @ invariant i < len(s)
 	// @ invariant acc(sl.Bytes(s, 0, len(s)), R40)
@@ -348,7 +353,7 @@ func LastIndexByte(s []byte, c byte) int {
 //
 // @ requires acc(sl.Bytes(s, 0, len(s)), R40)
 //
-// @ decreases _
+// @ decreases
 func IndexRune(s []byte, r rune) int {
 	switch {
 	case 0 <= r && r < utf8.RuneSelf:
@@ -356,6 +361,7 @@ func IndexRune(s []byte, r rune) int {
 	case r == utf8.RuneError:
 		// @ invariant acc(sl.Bytes(s, 0, len(s)), R40)
 		// @ invariant i >= 0
+		// @ decreases len(s) - i
 		for i := 0; i < len(s); {
 			// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
 			// @ assert forall j int :: {&s[i:][j]} 0 <= j && j < len(s[i:]) ==> &s[i:][j] == &s[j+i]
@@ -835,7 +841,7 @@ func Join(s [][]byte, sep []byte) []byte {
 //
 // @ ensures res ==> (len(s) >= len(prefix))
 //
-// @ decreases _
+// @ decreases
 func HasPrefix(s, prefix []byte) (res bool) {
 	//gobra:rewrite 2131f6a479f4a6519ab85f42f8e546d5fb121f7ad7c941d7a6b8daf2fa33cb68
 	//gobra:cont 	return len(s) >= len(prefix) && Equal(s[0:len(prefix)], prefix)
@@ -860,7 +866,7 @@ func HasPrefix(s, prefix []byte) (res bool) {
 //
 // @ ensures res ==> len(s) >= len(suffix)
 //
-// @ decreases _
+// @ decreases
 func HasSuffix(s, suffix []byte) (res bool) {
 	//gobra:rewrite 49653ed8abc2df0efb1fe82a8f6bccb36b7a6ca25b29b5ee7237b75d1cb8ef45
 	//gobra:cont 	return len(s) >= len(suffix) && Equal(s[len(s)-len(suffix):], suffix)
@@ -884,6 +890,7 @@ func HasSuffix(s, suffix []byte) (res bool) {
 // dropped from the byte slice with no replacement. The characters in s and the
 // output are interpreted as UTF-8-encoded code points.
 // @ trusted
+// @ decreases
 func Map(mapping func(r rune) rune, s []byte) []byte {
 	// In the worst case, the slice can grow when mapped, making
 	// things unpleasant. But it's so rare we barge in assuming it's
@@ -970,7 +977,7 @@ func Repeat(b []byte, count int) (res []byte) {
 		// @ assert 0 < count
 		// @ assert sl.Bytes(nb, 0, len(nb))
 
-		// @ decreases _
+		// @ decreases
 		// @ requires acc(sl.Bytes(b, 0, len(b)), R50)
 		// @ requires acc(sl.Bytes(nb, 0, len(nb)), R50)
 		// @ requires 0 < count
@@ -1006,11 +1013,12 @@ func Repeat(b []byte, count int) (res []byte) {
 //
 // @ preserves acc(sl.Bytes(s, 0, len(s)), R40)
 //
-// @ decreases _
+// @ decreases
 func ToUpper(s []byte) []byte {
 	isASCII, hasLower := true, false
 	// @ invariant acc(sl.Bytes(s, 0, len(s)), R40)
 	// @ invariant i >= 0
+	// @ decreases len(s) - i
 	for i := 0; i < len(s); i++ {
 		// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
 		c := s[i]
@@ -1039,6 +1047,7 @@ func ToUpper(s []byte) []byte {
 		// @ invariant acc(sl.Bytes(s, 0, len(s)), R40)
 		// @ invariant forall j int :: {&b[j]} 0 <= j && j < len(b) ==> acc(&b[j], 1)
 		// @ invariant i >= 0
+		// @ decreases len(s) - i
 		for i := 0; i < len(s); i++ {
 			// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
 			c := s[i]
@@ -1058,11 +1067,12 @@ func ToUpper(s []byte) []byte {
 //
 // @ preserves acc(sl.Bytes(s, 0, len(s)), R40)
 //
-// @ decreases _
+// @ decreases
 func ToLower(s []byte) (res []byte) {
 	isASCII, hasUpper := true, false
 	// @ invariant acc(sl.Bytes(s, 0, len(s)), R40)
 	// @ invariant i >= 0
+	// @ decreases len(s) - i
 	for i := 0; i < len(s); i++ {
 		// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
 		c := s[i]
@@ -1089,7 +1099,8 @@ func ToLower(s []byte) (res []byte) {
 		b := make([]byte, len(s))
 		// @ invariant acc(sl.Bytes(s, 0, len(s)), R40)
 		// @ invariant forall j int :: {&b[j]} 0 <= j && j < len(b) ==> acc(&b[j], 1)
-		// @ invariant i >= 0
+		// @ invariant InRangeInc(i, 0, len(s))
+		// @ decreases len(s) - i
 		for i := 0; i < len(s); i++ {
 			// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
 			c := s[i]
@@ -1108,7 +1119,7 @@ func ToLower(s []byte) (res []byte) {
 //
 // @ preserves acc(sl.Bytes(s, 0, len(s)), R40)
 //
-// @ decreases _
+// @ decreases
 func ToTitle(s []byte) []byte { return Map(unicode.ToTitle, s) }
 
 // ToUpperSpecial treats s as UTF-8-encoded bytes and returns a copy with all the Unicode letters mapped to their
@@ -1116,7 +1127,7 @@ func ToTitle(s []byte) []byte { return Map(unicode.ToTitle, s) }
 //
 // @ preserves acc(sl.Bytes(s, 0, len(s)), R40)
 //
-// @ decreases _
+// @ decreases
 func ToUpperSpecial(c unicode.SpecialCase, s []byte) []byte {
 	return Map(c.ToUpper, s)
 }
@@ -1126,7 +1137,7 @@ func ToUpperSpecial(c unicode.SpecialCase, s []byte) []byte {
 //
 // @ preserves acc(sl.Bytes(s, 0, len(s)), R40)
 //
-// @ decreases _
+// @ decreases
 func ToLowerSpecial(c unicode.SpecialCase, s []byte) []byte {
 	return Map(c.ToLower, s)
 }
@@ -1136,7 +1147,7 @@ func ToLowerSpecial(c unicode.SpecialCase, s []byte) []byte {
 //
 // @ preserves acc(sl.Bytes(s, 0, len(s)), R40)
 //
-// @ decreases _
+// @ decreases
 func ToTitleSpecial(c unicode.SpecialCase, s []byte) []byte {
 	return Map(c.ToTitle, s)
 }
@@ -1147,7 +1158,7 @@ func ToTitleSpecial(c unicode.SpecialCase, s []byte) []byte {
 // @ preserves acc(sl.Bytes(s, 0, len(s)), R40)
 // @ preserves acc(sl.Bytes(replacement, 0, len(replacement)), R40)
 //
-// @ decreases _
+// @ decreases
 func ToValidUTF8(s, replacement []byte) []byte {
 	b := make([]byte, 0, len(s)+len(replacement))
 	invalid := false // previous byte was from an invalid UTF-8 sequence
@@ -1156,6 +1167,7 @@ func ToValidUTF8(s, replacement []byte) []byte {
 	// @ invariant acc(sl.Bytes(replacement, 0, len(replacement)), R40)
 	// @ invariant sl.Bytes(b, 0, len(b))
 	// @ invariant i >= 0
+	// @ decreases len(s) - i
 	for i := 0; i < len(s); {
 		// @ unfold sl.Bytes(b, 0, len(b))
 		// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
@@ -1196,7 +1208,7 @@ func ToValidUTF8(s, replacement []byte) []byte {
 // isSeparator reports whether the rune could mark a word boundary.
 // TODO: update when package unicode captures more of the properties.
 //
-// @ decreases _
+// @ decreases
 func isSeparator(r rune) bool {
 	// ASCII alphanumerics and underscore are not separators
 	if r <= 0x7F {
@@ -1228,7 +1240,7 @@ func isSeparator(r rune) bool {
 //
 // @ preserves acc(sl.Bytes(s, 0, len(s)), R40)
 //
-// @ decreases _
+// @ decreases
 func Title(s []byte) []byte {
 	// Use a closure here to remember state.
 	// Hackish but effective. Depends on Map scanning in order and calling
@@ -1241,7 +1253,7 @@ func Title(s []byte) []byte {
 	return Map(
 		// @ requires acc(&prev)
 		//
-		// @ decreases _
+		// @ decreases
 		func(r rune) rune {
 			if isSeparator(prev) {
 				prev = r
@@ -1264,7 +1276,7 @@ func Title(s []byte) []byte {
 //
 // @ ensures res != nil ==> (forall j int :: {&s[idx:][j]} 0 <= j && j < len(s[idx:]) ==> &s[idx:][j] == &res[j])
 //
-// @ decreases _
+// @ decreases
 func TrimLeftFunc(s []byte, f func(r rune) bool) (res []byte /*@, ghost idx int @*/) {
 	i := indexFunc(s, f, false)
 	if i == -1 {
@@ -1282,7 +1294,7 @@ func TrimLeftFunc(s []byte, f func(r rune) bool) (res []byte /*@, ghost idx int 
 //
 // @ ensures forall j int :: {&s[:idx][j]} 0 <= j && j < len(s[:idx]) ==> &s[:idx][j] == &res[j]
 //
-// @ decreases _
+// @ decreases
 func TrimRightFunc(s []byte, f func(r rune) bool) (res []byte /*@ , ghost idx int @*/) {
 	i := lastIndexFunc(s, f, false)
 	// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
@@ -1302,6 +1314,7 @@ func TrimRightFunc(s []byte, f func(r rune) bool) (res []byte /*@ , ghost idx in
 // TrimFunc returns a subslice of s by slicing off all leading and trailing
 // UTF-8-encoded code points c that satisfy f(c).
 // @ trusted
+// @ decreases
 func TrimFunc(s []byte, f func(r rune) bool) []byte {
 	return TrimRightFunc(TrimLeftFunc(s, f), f)
 }
@@ -1313,7 +1326,7 @@ func TrimFunc(s []byte, f func(r rune) bool) []byte {
 //
 // @ preserves acc(sl.Bytes(prefix, 0, len(prefix)), R40)
 //
-// @ decreases _
+// @ decreases
 func TrimPrefix(s, prefix []byte) []byte {
 	if HasPrefix(s, prefix) {
 		return s[len(prefix):]
@@ -1328,7 +1341,7 @@ func TrimPrefix(s, prefix []byte) []byte {
 //
 // @ preserves acc(sl.Bytes(suffix, 0, len(suffix)), R40)
 //
-// @ decreases _
+// @ decreases
 func TrimSuffix(s, suffix []byte) []byte {
 	if HasSuffix(s, suffix) {
 		return s[:len(s)-len(suffix)]
@@ -1342,7 +1355,7 @@ func TrimSuffix(s, suffix []byte) []byte {
 //
 // @ preserves acc(sl.Bytes(s, 0, len(s)), R40)
 //
-// @ decreases _
+// @ decreases
 func IndexFunc(s []byte, f func(r rune) bool) int {
 	return indexFunc(s, f, true)
 }
@@ -1353,7 +1366,7 @@ func IndexFunc(s []byte, f func(r rune) bool) int {
 //
 // @ preserves acc(sl.Bytes(s, 0, len(s)), R40)
 //
-// @ decreases _
+// @ decreases
 func LastIndexFunc(s []byte, f func(r rune) bool) int {
 	return lastIndexFunc(s, f, true)
 }
@@ -1366,7 +1379,7 @@ func LastIndexFunc(s []byte, f func(r rune) bool) int {
 //
 // @ ensures res == -1 || (0 <= res && res < len(s))
 //
-// @ decreases _
+// @ decreases
 //
 // @ trusted
 func indexFunc(s []byte, f func(r rune) bool, truth bool) (res int) {
@@ -1393,7 +1406,7 @@ func indexFunc(s []byte, f func(r rune) bool, truth bool) (res int) {
 //
 // @ ensures -1 <= res && res < len(s)
 //
-// @ decreases _
+// @ decreases
 //
 // @ trusted
 func lastIndexFunc(s []byte, f func(r rune) bool, truth bool) (res int) {
@@ -1453,6 +1466,7 @@ func makeASCIISet(chars string) (asc asciiSet, ok bool) {
 // contains reports whether c is inside the set.
 //
 // @ trusted
+// @ decreases
 //
 //gobra:rewrite 0f0ebbd7ca470d581fd1af46ca0cfe9b2ac2c405c24300860944b852a7de1dc5
 //gobra:cont func (as *asciiSet) contains(c byte) bool {
@@ -1469,6 +1483,7 @@ func (asc *asciiSet) contains(c byte) bool {
 // to avoid importing the strings package.
 // We avoid bytes.ContainsRune to avoid allocating a temporary copy of s.
 // @ trusted
+// @ decreases
 func containsRune(s string, r rune) bool {
 	for _, c := range s {
 		if c == r {
@@ -1546,7 +1561,7 @@ func trimLeftByte(s []byte, c byte) []byte {
 //
 // @ preserves acc(asc, _)
 //
-// @ decreases _
+// @ decreases
 //
 //gobra:rewrite 0387089c2272afa3e2a8a1a4875bb9c5c94815f4578982adbe8355e0dc4bb562
 //gobra:cont func trimLeftASCII(s []byte, as *asciiSet) []byte {
@@ -1556,6 +1571,7 @@ func trimLeftByte(s []byte, c byte) []byte {
 func trimLeftASCII(s []byte, asc *asciiSet) []byte {
 	// @ invariant forall i int :: {&s[i]} 0 <= i && i < len(s) ==> acc(&s[i], _)
 	// @ invariant acc(asc, _)
+	// @ decreases len(s)
 	for len(s) > 0 {
 		if !asc.contains(s[0]) {
 			//gobra:endrewrite 0387089c2272afa3e2a8a1a4875bb9c5c94815f4578982adbe8355e0dc4bb562
@@ -1573,13 +1589,14 @@ func trimLeftASCII(s []byte, asc *asciiSet) []byte {
 
 // @ preserves acc(sl.Bytes(s, 0, len(s)), R40)
 //
-// @ decreases _
+// @ decreases
 func trimLeftUnicode(s []byte, cutset string) []byte {
 	// @ ghost olds := s
 	// @ ghost idx := 0
 	// @ invariant 0 <= idx && idx <= len(olds)
 	// @ invariant olds[idx:] === s
 	// @ invariant acc(sl.Bytes(olds, 0, len(olds)), R40)
+	// @ decreases len(s)
 	for len(s) > 0 {
 		// @ unfold acc(sl.Bytes(olds, 0, len(olds)), R40)
 		// @ assert forall j int :: {&olds[idx:][j]} 0 <= j && j < len(olds[idx:]) ==> &olds[idx:][j] == &olds[j+idx]
@@ -1630,7 +1647,7 @@ func TrimRight(s []byte, cutset string) []byte {
 
 // @ preserves acc(sl.Bytes(s, 0, len(s)), R40)
 //
-// @ decreases _
+// @ decreases
 func trimRightByte(s []byte, c byte) []byte {
 	//gobra:rewrite 31b9f02d21540a41351d8bce67a9db8399d8c59e6312bcf5ebe870692897747f
 	//gobra:cont 	for len(s) > 0 && s[len(s)-1] == c {
@@ -1642,6 +1659,7 @@ func trimRightByte(s []byte, c byte) []byte {
 	// @ invariant 0 <= idx && idx <= len(olds)
 	// @ invariant olds[:idx] === s
 	// @ invariant acc(sl.Bytes(olds, 0, len(olds)), R40)
+	// @ decreases len(s)
 	for len(s) > 0 && /* @ unfolding acc(sl.Bytes(olds, 0, len(olds)), R40) in @ */ s[len(s)-1] == c {
 		// @ unfold acc(sl.Bytes(olds, 0, len(olds)), R40)
 		// @ idx = len(s)-1
@@ -1656,7 +1674,7 @@ func trimRightByte(s []byte, c byte) []byte {
 //
 // @ preserves acc(asc, R40)
 //
-// @ decreases _
+// @ decreases
 //
 //gobra:rewrite 8c5e716b23a66f72365a9505e211ec2676a538b1b7f603a6a87fa45a9448fab6
 //gobra:cont func trimRightASCII(s []byte, as *asciiSet) []byte {
@@ -1670,6 +1688,7 @@ func trimRightASCII(s []byte, asc *asciiSet) []byte {
 	// @ invariant olds[:idx] === s
 	// @ invariant acc(sl.Bytes(olds, 0, len(olds)), R40)
 	// @ invariant acc(asc, R40)
+	// @ decreases len(s)
 	for len(s) > 0 {
 		// @ unfold acc(sl.Bytes(olds, 0, len(olds)), R40)
 		if !asc.contains(s[len(s)-1]) {
@@ -1686,13 +1705,14 @@ func trimRightASCII(s []byte, asc *asciiSet) []byte {
 
 // @ preserves acc(sl.Bytes(s, 0, len(s)), R40)
 //
-// @ decreases _
+// @ decreases
 func trimRightUnicode(s []byte, cutset string) []byte {
 	// @ ghost olds := s
 	// @ ghost idx := len(s)
 	// @ invariant 0 <= idx && idx <= len(olds)
 	// @ invariant olds[:idx] === s
 	// @ invariant acc(sl.Bytes(olds, 0, len(olds)), R40)
+	// @ decreases len(s)
 	for len(s) > 0 {
 		// @ unfold acc(sl.Bytes(olds, 0, len(olds)), R40)
 		r, n := rune(s[len(s)-1]), 1
@@ -1715,12 +1735,13 @@ func trimRightUnicode(s []byte, cutset string) []byte {
 //
 // @ preserves acc(sl.Bytes(s, 0, len(s)), R40)
 //
-// @ decreases _
+// @ decreases
 func TrimSpace(s []byte) (res []byte) {
 	// Fast path for ASCII: look for the first ASCII non-space byte
 	start := 0
 	// @ invariant acc(sl.Bytes(s, 0, len(s)), R40)
 	// @ invariant 0 <= start && start <= len(s)
+	// @ decreases len(s) - start
 	for ; start < len(s); start++ {
 		// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
 		c := s[start]
@@ -1755,6 +1776,7 @@ func TrimSpace(s []byte) (res []byte) {
 	// @ invariant start == oldStart
 	// @ invariant stop <= len(s)
 	// @ invariant start <= stop
+	// @ decreases stop - start
 	for ; stop > start; stop-- {
 		// @ unfold acc(sl.Bytes(s, 0, len(s)), R40)
 		c := s[stop-1]
@@ -1797,7 +1819,7 @@ func TrimSpace(s []byte) (res []byte) {
 //
 // @ ensures sl.ViewRunes(res) == utf8.Codepoints(s)
 //
-// @ decreases _
+// @ decreases
 func Runes(s []byte) (res []rune) {
 	//gobra:rewrite 5aab27295fdb5ccf8c220250bc5b75224bfd961a47a286501fad584575d50cda
 	//gobra:cont 	t := make([]rune, utf8.RuneCount(s))
@@ -1851,6 +1873,9 @@ func Runes(s []byte) (res []rune) {
 // @ preserves acc(sl.Bytes(oldval, 0, len(oldval)), R40)
 //
 // @ preserves acc(sl.Bytes(newval, 0, len(newval)), R40)
+//
+// @ decreases
+//
 // @ trusted
 //
 //gobra:rewrite 97d56fc6453211521dade272298f0508c52e5884a5900aa9e86582e4e7cfd59f
@@ -1934,7 +1959,7 @@ func Replace(s, oldval, newval []byte, n int) (res []byte) {
 //
 // @ preserves acc(sl.Bytes(newval, 0, len(newval)), R40)
 //
-// @ decreases _
+// @ decreases
 //
 //gobra:rewrite 97c2ede7687475e639eb6cf004d3abccbd534c90686609842d241e0faf3710c5
 //gobra:cont func ReplaceAll(s, old, new []byte) []byte {
@@ -2054,7 +2079,7 @@ hasUnicode:
 //
 // @ ensures res == -1 ==> forall i int :: {View(s)[i:i+len(sep)]} 0 <= i && i + len(sep) <= len(s) ==> View(s)[i:i+len(sep)] != View(sep)
 //
-// @ decreases _
+// @ decreases
 func Index(s, sep []byte) (res int) {
 	n := len(sep)
 	switch {
@@ -2104,6 +2129,7 @@ func Index(s, sep []byte) (res int) {
 		// @ invariant fails >= 0
 		// @ invariant t == len(s) - n + 1
 		// @ invariant forall j int :: { View(s)[j:j+len(sep)] } 0 <= j && j < i ==> View(s)[j:j+len(sep)] != View(sep)
+		// @ decreases t - i
 		for i < t {
 			// @ ghost vs := View(s)
 			// @ unfold acc(sl.Bytes(s, 0, len(s)), R41)
@@ -2200,9 +2226,10 @@ func Index(s, sep []byte) (res int) {
 	// @ invariant vsep == View(sep)
 	// @ invariant c0 == vsep[0]
 	// @ invariant c1 == vsep[1]
-	// @ invariant i >= 0
+	// @ invariant InRangeInc(i, 0, t)
 	// @ invariant t == len(s) - n + 1
 	// @ invariant forall j int :: { vs[j:j+len(sep)] } 0 <= j && j < i ==> vs[j:j+len(sep)] != vsep
+	// @ decreases t - i
 	for i < t {
 		// @ unfold acc(sl.Bytes(s, 0, len(s)), R41)
 		if s[i] != c0 {
@@ -2276,7 +2303,7 @@ func Index(s, sep []byte) (res int) {
 // @ ensures !found ==> forall i int :: {View(s)[i:i+len(sep)]} 0 <= i && i + len(sep) <= len(s) ==> View(s)[i:i+len(sep)] != View(sep)
 // @ ensures !found ==> len(s) == len(b) && (forall i int :: {&s[i]}{&b[i]} 0 <= i && i < len(s) ==> &s[i] == &b[i]) && after == nil
 //
-// @ decreases _
+// @ decreases
 //
 //gobra:rewrite e87ea459dcf89b1423be9fd397d8f4767ad24881f1ab27c606aec78e6a86fea4
 //gobra:cont func Cut(s, sep []byte) (before, after []byte, found bool) {
@@ -2295,7 +2322,7 @@ func Cut(s, sep []byte) (b, after []byte, found bool) {
 //
 // @ ensures View(b) == View(res)
 //
-// @ decreases _
+// @ decreases
 func Clone(b []byte) (res []byte) {
 	if b == nil {
 		// @ fold sl.Bytes(res, 0, len(res))

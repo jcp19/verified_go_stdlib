@@ -70,7 +70,7 @@ func axiomSpecRepeatCommutative(b seq[byte], n int)
 ghost
 requires n >= 0
 ensures SpecRepeat(b, 2 * n) == SpecRepeat(b, n) ++ SpecRepeat(b, n)
-decreases _
+decreases n
 func lemmaSpecRepeat_2n(b seq[byte], n int) {
 	if n != 0 {
 		assert SpecRepeat(b, n) == b ++ SpecRepeat(b, n - 1)
@@ -136,7 +136,7 @@ func lemmaIndexIndexByteIsNotPrefix(s, sep seq[byte], i, t, o int) {
 	invariant forall j int :: {s[i+1:t][j]} 0 <= j && j < o ==> s[i+1:t][j] != sep[0]
 	invariant i+1 <= idx
 	invariant forall j int :: { s[j:j+len(sep)] } 0 <= j && j < idx ==> s[j:j+len(sep)] != sep
-	decreases _
+	decreases i+o+1-idx
 	for idx := i+1; idx < i+o+1 ; idx++ {
 		assert s[idx] == s[i+1:t][idx - (i+1)]
 		assert s[idx] != sep[0]
@@ -158,7 +158,7 @@ decreases
 func lemmaIndexIndexByteNotFound(s, sep seq[byte], i, t int) {
 	invariant i+1 <= idx
 	invariant forall j int :: { s[j:j+len(sep)] } 0 <= j && j < idx ==> s[j:j+len(sep)] != sep
-	decreases _
+	decreases t-idx
 	for idx := i+1; idx < t; idx++ {
 
 		assert s[idx] == s[i+1:t][idx - (i+1)]
