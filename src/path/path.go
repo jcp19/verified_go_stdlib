@@ -509,7 +509,6 @@ func Clean(path string_byte) (res string_byte) {
 		//gobra:rewrite 7217a0df192ee4c8dace6a1956998718431158b18202a1c4e6de8921479f6bd3
 		//gobra:cont 		return "."
 		//gobra:end-old-code 7217a0df192ee4c8dace6a1956998718431158b18202a1c4e6de8921479f6bd3
-		// @ axiomStringByteAcc(path)
 		res = string_byte{'.'}
 		// @ fold acc(sl.Bytes(res, 0, len(res)), R40)
 		// @ assert SpecClean(ToPath(bytes.View(path))) == ToPath(bytes.View(res))

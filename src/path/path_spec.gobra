@@ -302,17 +302,6 @@ func lemmaSlicesIneqLastElem(a, b seq[byte], aLast, bLast byte) {
 	}
 }
 
-// technically this axiom is not needed. however,
-// I was encountering some issues with the permissions.
-// Since `string` is not a mutable type in the first place,
-// this axiom exists to focus on the more interesting parts
-// of the program
-ghost
-ensures acc(sl.Bytes(path, 0, len(path)), R40)
-trusted
-decreases _
-func axiomStringByteAcc(path string_byte)
-
 ghost
 requires InRangeInc(r, 0, len(p))
 decreases
