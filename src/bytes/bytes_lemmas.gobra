@@ -3,12 +3,12 @@ package bytes
 // +gobra
 
 import (
-   . "verification/utils/definitions"
-   b "verification/utils/bitwise"
-   sl "verification/utils/slices"
-   seqs "verification/utils/seqs"
-   sets "verification/utils/sets"
-   . "bytes/spec"
+	. "verification/utils/definitions"
+	// b "verification/utils/bitwise"
+	sl "gobra-libs/byteslice"
+	// seqs "verification/utils/seqs"
+	// sets "verification/utils/sets"
+	. "bytes/spec"
 )
 
 

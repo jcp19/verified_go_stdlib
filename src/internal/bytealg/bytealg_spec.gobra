@@ -4,7 +4,7 @@ package bytealg
 
 import (
 	. "verification/utils/definitions"
-	sl "verification/utils/slices"
+	sl "gobra-libs/byteslice"
 	. "bytes/spec"
 )
 
@@ -12,8 +12,8 @@ preserves acc(sl.Bytes(b, 0, len(b)), R50)
 ensures res >= 0
 ensures len(indices) == res
 ensures forall i int :: {i in indices} i in indices ==> 0 <= i && i < len(b)
-ensures forall i int :: {i in indices} i in indices ==> ( sl.GetByte(b, 0, len(b), i) == c)
-ensures forall i int :: {i in indices} !(i in indices) ==> ( i < 0 || len(b) <= i || sl.GetByte(b, 0, len(b), i) != c)
+ensures forall i int :: {i in indices} i in indices ==> ( sl.Byte(b, 0, len(b), i) == c)
+ensures forall i int :: {i in indices} !(i in indices) ==> ( i < 0 || len(b) <= i || sl.Byte(b, 0, len(b), i) != c)
 trusted
 decreases
 func Count(b []byte, c byte) (res int , ghost indices set[int])
