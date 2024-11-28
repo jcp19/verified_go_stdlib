@@ -818,13 +818,6 @@ func lemmaSplitInnerAddSep(s, ac seq[byte], res1, res2 seq[seq[byte]]) {
 	}
 }
 
-// TODO
-ghost
-requires a == b
-ensures a === b
-trusted
-decreases
-func axiomEqualGhostEqualPath(a, b Path)
 
 ghost
 ensures toPath(p, rooted).parts == p
@@ -912,13 +905,14 @@ func lemmaToPathAppendingSlash(prev Path, p seq[byte]) {
 		assert toPath(beforeSplit, true).parts == prev.parts
 
 		lemma_toPathPrefix(beforeSplit, seq[Segment]{ seq[byte]{} }, true)
-		assert toPath(beforeSplit, true).parts ++ seq[Segment]{ seq[byte]{} } == toPath(afterSplit, true).parts
-		assert ToPath(p ++ seq[byte]{ '/' }) == toPath(afterSplit, true)
+		assert toPath(beforeSplit, true).parts ++ seq[Segment]{ seq[byte]{} } === toPath(afterSplit, true).parts
+		assert pathContents(p++sep) == p[1:] ++ sep
+		assert ToPath(p ++ sep) === toPath( bytes.SpecSplit(p[1:] ++ sep, sep ), true)
+		assert ToPath(p ++ seq[byte]{ '/' }) === toPath(afterSplit, true)
 		assert prev == toPath(beforeSplit, true)
-		assert afterSplit == beforeSplit ++ seq[Segment]{ seq[byte]{} }
+		assert afterSplit === beforeSplit ++ seq[Segment]{ seq[byte]{} }
 		lemma_toPathSplit(afterSplit, true)
-		assert ToPath(p ++ seq[byte]{'/'}) == toPath(afterSplit, true)
-		axiomEqualGhostEqualPath(ToPath(p ++ seq[byte]{'/'}), toPath(afterSplit, true))
+		assert ToPath(p ++ seq[byte]{'/'}) === toPath(afterSplit, true)
 		assert ToPath(p) === toPath(beforeSplit, true)
 		assert ToPath(p ++ seq[byte]{ '/' }).parts == prev.parts ++ seq[Segment]{ seq[byte]{} }
 	default:
@@ -1042,14 +1036,15 @@ func lemmaSpecSplitInnerAppendDotdot(s, ac seq[byte], all, prefix seq[seq[byte]]
 
 ghost
 requires isCompleted(p)
-requires prev == ToPath(p)
+requires prev === ToPath(p)
 ensures ToPath(p ++ seq[byte]{ '.', '.' }).rooted == prev.rooted
 ensures ToPath(p ++ seq[byte]{ '.', '.' }).parts == prev.parts[:len(prev.parts)-1] ++ seq[Segment]{ dotdot() }
 decreases
 func lemmaToPathAppendingDotdot(prev Path, p seq[byte]) {
-	res := ToPath(p ++ seq[byte]{'.','.'})
+	dotdot := seq[byte]{'.','.'}
+	res := ToPath(p ++ dotdot)
 	sep := seq[byte]{'/'}
-	tail := seq[seq[byte]]{ seq[byte]{'.','.'} }
+	tail := seq[seq[byte]]{ dotdot }
 	if len(p) == 0 || p[0] != '/' {
 		assert pathContents(p) == p
 		assert !isRooted(p)
@@ -1064,9 +1059,7 @@ func lemmaToPathAppendingDotdot(prev Path, p seq[byte]) {
 		assert split1[:len(split1)-1] ++ tail == split2
 
 		assert prev == toPath(split1, rooted)
-		axiomEqualGhostEqualPath(prev, toPath(split1, rooted))
 		assert res  == toPath(split2, rooted)
-		axiomEqualGhostEqualPath(res, toPath(split2, rooted))
 		
 		lemma_toPathSplit(split1, rooted)
 		assert prev.parts == split1
@@ -1075,6 +1068,7 @@ func lemmaToPathAppendingDotdot(prev Path, p seq[byte]) {
 
 	} else {
 		assert pathContents(p) == p[1:]
+		assert pathContents(p++dotdot) == p[1:]++dotdot
 		assert isRooted(p)
 		rooted := true
 
@@ -1087,10 +1081,8 @@ func lemmaToPathAppendingDotdot(prev Path, p seq[byte]) {
 		assert res == toPath(bytes.SpecSplit(p, sep), rooted)
 		assert split1[:len(split1)-1] ++ tail == split2
 
-		assert prev == toPath(split1, rooted)
-		axiomEqualGhostEqualPath(prev, toPath(split1, rooted))
-		assert res  == toPath(split2, rooted)
-		axiomEqualGhostEqualPath(res, toPath(split2, rooted))
+		assert prev === toPath(split1, rooted)
+		assert res  === toPath(split2, rooted)
 		
 		lemma_toPathSplit(split1, rooted)
 		assert prev.parts == split1
