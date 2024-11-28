@@ -10,10 +10,11 @@ package bytes
 
 import (
 	// @	. "verification/utils/definitions"
+	// @	sl "gobra-libs/byteslice"
 	// @	b "verification/utils/bitwise"
-	// @	sl "verification/utils/slices"
-	// @	seqs "verification/utils/seqs"
-	// @	sets "verification/utils/sets"
+	// @	rsl "verification/utils/slices"
+	// #	seqs "gobra-libs/seqs"
+	// #	sets "gobra-libs/sets"
 	// @	. "bytes/spec"
 	"internal/bytealg"
 	"unicode"
@@ -1815,9 +1816,9 @@ func TrimSpace(s []byte) (res []byte) {
 //
 // @ preserves acc(sl.Bytes(s, 0, len(s)), R40)
 //
-// @ ensures sl.Runes(res, 0, len(res))
+// @ ensures rsl.Runes(res, 0, len(res))
 //
-// @ ensures sl.ViewRunes(res) == utf8.Codepoints(s)
+// @ ensures rsl.ViewRunes(res) == utf8.Codepoints(s)
 //
 // @ decreases
 func Runes(s []byte) (res []rune) {
@@ -1832,20 +1833,20 @@ func Runes(s []byte) (res []rune) {
 	// @ ghost olds := s
 	// @ ghost idx := 0
 	// @ ghost codepoints := utf8.Codepoints(s)
-	// @ fold sl.Runes(t, 0, len(t))
+	// @ fold rsl.Runes(t, 0, len(t))
 	// @ invariant i <= idx
 	// @ invariant 0 <= idx && idx <= len(olds)
 	// @ invariant acc(sl.Bytes(olds, 0, len(olds)), R40)
 	// @ invariant olds[idx:] === s
-	// @ invariant sl.Runes(t, 0, len(t))
+	// @ invariant rsl.Runes(t, 0, len(t))
 	// @ invariant utf8.Codepoints(s) == codepoints[i:]
 	// @ invariant 0 <= i && i <= len(t)
 	// @ invariant i == len(t) - len(utf8.Codepoints(s))
 	// @ invariant len(s) > 0 ==> i < len(t)
-	// @ invariant sl.ViewRunes(t)[:i] == codepoints[:i]
+	// @ invariant rsl.ViewRunes(t)[:i] == codepoints[:i]
 	// @ decreases len(s)
 	for len(s) > 0 {
-		// @ unfold sl.Runes(t, 0, len(t))
+		// @ unfold rsl.Runes(t, 0, len(t))
 		// @ unfold acc(sl.Bytes(olds, 0, len(olds)), R40)
 		// @ assert forall j int :: {&olds[idx:][j]} 0 <= j && j < len(olds[idx:]) ==> &olds[idx:][j] == &olds[j+idx]
 		// @ fold acc(sl.Bytes(s, 0, len(s)), R40)
@@ -1856,7 +1857,7 @@ func Runes(s []byte) (res []rune) {
 		s = s[l:]
 		// @ idx += l
 		// @ fold acc(sl.Bytes(olds, 0, len(olds)), R40)
-		// @ fold sl.Runes(t, 0, len(t))
+		// @ fold rsl.Runes(t, 0, len(t))
 	}
 	return t
 }

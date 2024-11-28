@@ -3,14 +3,14 @@ package spec
 // +gobra
 
 import (
-	sl "verification/utils/slices"
+	sl "gobra-libs/byteslice"
 )
 
 ghost
 requires acc(sl.Bytes(ub, 0, len(ub)), _)
 ensures len(res) == len(ub)
 ensures forall i int :: { res[i] } 0 <= i && i < len(ub) ==>
-    res[i] == sl.GetByte(ub, 0, len(ub), i)
+    res[i] == sl.Byte(ub, 0, len(ub), i)
 decreases _
 pure func View(ub []byte) (res seq[byte])
 

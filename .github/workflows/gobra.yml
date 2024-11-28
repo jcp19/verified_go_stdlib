@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Checkout the verified_go_stdlib repository
         uses: actions/checkout@v3
+        with:
+          submodules: 'true'
       - name: Cache the verification results
         uses: actions/cache@v3
         env:
