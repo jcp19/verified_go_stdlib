@@ -13,10 +13,10 @@ package path
 
 // @ import (
 // @	. "verification/utils/definitions"
-// @	sl "verification/utils/slices"
+// @	sl "gobra-libs/byteslice"
 // @	seqs "verification/utils/seqs"
 // @	sets "verification/utils/sets"
-// @	bytes "bytes/spec"
+// @	bytes "gobra-libs/bytes"
 // @ )
 
 // +gobra
@@ -121,7 +121,7 @@ func (b *lazybuf) append(c byte) {
 	// @ outline (
 
 	// @ unfold Lazybuf(b, R41)
-	// @ assert bytes.View(b.s)[:b.w+1] != bytes.View(b.buf)[:b.w]
+	// @ assert sl.View(b.s)[:b.w+1] != sl.View(b.buf)[:b.w]
 	// @ assert b.buf != nil
 	// @ assert len(b.buf) == len(b.s)
 	// @ assert b.w < len(b.s)
@@ -138,7 +138,7 @@ func (b *lazybuf) append(c byte) {
 
 // @ requires Lazybuf(b, R41)
 // @ ensures acc(sl.Bytes(res, 0, len(res)), R41)
-// @ ensures bytes.View(res) == old(getValue(b))
+// @ ensures sl.View(res) == old(getValue(b))
 func (b *lazybuf) string() (res string_byte) {
 	// @ unfold Lazybuf(b, R41)
 	if b.buf == nil {
@@ -187,7 +187,7 @@ func (b *lazybuf) string() (res string_byte) {
 //
 // @ ensures acc( sl.Bytes(res, 0, len(res)), R41 )
 //
-// @ ensures SpecClean(ToPath(bytes.View(path))) == ToPath(bytes.View(res))
+// @ ensures SpecClean(ToPath(sl.View(path))) == ToPath(sl.View(res))
 func Clean(path string_byte) (res string_byte) {
 	//gobra:rewrite 70493558394bddd26fc4913b3282a2fc8d74fce232cdd1932ae5fad203b0798b
 	//gobra:cont 	if path == "" {
@@ -197,9 +197,9 @@ func Clean(path string_byte) (res string_byte) {
 	if len(path) == 0 {
 		res = string_byte{'.'}
 		// @ fold sl.Bytes(res, 0, len(res))
-		// @ lemmaToPathDot(bytes.View(res))
+		// @ lemmaToPathDot(sl.View(res))
 
-		// @ assert SpecClean(ToPath(bytes.View(path))) == ToPath(bytes.View(res))
+		// @ assert SpecClean(ToPath(sl.View(path))) == ToPath(sl.View(res))
 		// @ assert acc( sl.Bytes(res, 0, len(res)), R41 )
 		return res
 	}
@@ -221,7 +221,7 @@ func Clean(path string_byte) (res string_byte) {
 	// @ fold Lazybuf(&out, R41)
 	// @ assert Lazybuf(&out, R41)
 	// @ assert unfolding Lazybuf(&out, R41) in len(out.s) == n
-	// @ assert unfolding Lazybuf(&out, R41) in len(bytes.View(out.s)) == n
+	// @ assert unfolding Lazybuf(&out, R41) in len(sl.View(out.s)) == n
 	// @ assert len(getS(&out)) == n
 	// @ assert n == len(getS(&out))
 	r, dotdot := 0, 0
@@ -249,14 +249,14 @@ func Clean(path string_byte) (res string_byte) {
 	// @ invariant rooted ==> unfolding Lazybuf(&out, R41) in InRangeInc(out.w, 0, n)
 	// @ invariant n == len(getS(&out))
 	// @ invariant acc(sl.Bytes(path, 0, len(path)), R41)
-	// @ invariant !rooted ==> bytes.View(path)[0] != '/'
+	// @ invariant !rooted ==> sl.View(path)[0] != '/'
 	// @ invariant rooted ==> 1 <= len(getValue(&out)) && getValue(&out)[0] == '/'
 	// @ invariant !rooted && 1 <= len(getValue(&out)) ==> getValue(&out)[0] != '/'
-	// @ invariant isCompleted(bytes.View(path)[:r]) || willBeCompleted(bytes.View(path), r)
+	// @ invariant isCompleted(sl.View(path)[:r]) || willBeCompleted(sl.View(path), r)
 	// @ invariant noTrailingSlash(getValue(&out), rooted)
 	// @ invariant noDoubleSlash(getValue(&out))
-	// @ invariant readingIsAheadOfWriting(bytes.View(path), getW(&out), r, rooted)
-	// @ invariant SpecClean(ToPath(bytes.View(path)[:r] )) == ToPath( getValue(&out) )
+	// @ invariant readingIsAheadOfWriting(sl.View(path), getW(&out), r, rooted)
+	// @ invariant SpecClean(ToPath(sl.View(path)[:r] )) == ToPath( getValue(&out) )
 	for r < n {
 		// @ unfold acc(sl.Bytes(path, 0, len(path)), R45)
 		switch {
@@ -265,33 +265,33 @@ func Clean(path string_byte) (res string_byte) {
 			r++
 			// @ assert rooted ==> 1 <= len(getValue(&out)) && getValue(&out)[0] == '/'
 			// @ assert noTrailingSlash(getValue(&out), rooted)
-			// # assert noIncompleteRead(bytes.View(path), r, rooted)
+			// # assert noIncompleteRead(sl.View(path), r, rooted)
 			// @ assert noDoubleSlash(getValue(&out))
-			// @ assert readingIsAheadOfWriting(bytes.View(path), getW(&out), r, rooted)
+			// @ assert readingIsAheadOfWriting(sl.View(path), getW(&out), r, rooted)
 			// @ lemmaToPathAppendingSlash(
-			// @	ToPath(bytes.View(path)[:r-1] ),
-			// @	bytes.View(path)[:r-1],
+			// @	ToPath(sl.View(path)[:r-1] ),
+			// @	sl.View(path)[:r-1],
 			// @ )
-			// @ assert SpecClean(ToPath(bytes.View(path)[:r] )) == ToPath( getValue(&out) )
-			// @ assert isCompleted(bytes.View(path)[:r])
+			// @ assert SpecClean(ToPath(sl.View(path)[:r] )) == ToPath( getValue(&out) )
+			// @ assert isCompleted(sl.View(path)[:r])
 		case path[r] == '.' && (r+1 == n || path[r+1] == '/'):
 			// . element
 			r++
 			// @ assert rooted ==> 1 <= len(getValue(&out)) && getValue(&out)[0] == '/'
 			// @ assert noTrailingSlash(getValue(&out), rooted)
 
-			// # assert noIncompleteRead(bytes.View(path), r, rooted)
+			// # assert noIncompleteRead(sl.View(path), r, rooted)
 			// @ assert noDoubleSlash(getValue(&out))
-			// @ assert readingIsAheadOfWriting(bytes.View(path), getW(&out), r, rooted)
-			// @ assert willBeCompleted(bytes.View(path), r)
+			// @ assert readingIsAheadOfWriting(sl.View(path), getW(&out), r, rooted)
+			// @ assert willBeCompleted(sl.View(path), r)
 		case path[r] == '.' && path[r+1] == '.' && (r+2 == n || path[r+2] == '/'):
 			// .. element: remove to last /
 			// @ assert !(path[r] == '.' && (r+1 == n || path[r+1] == '/'))
 			// @ assert !(r+1 == n || path[r+1] == '/')
 			// @ assert !(r+1 == n)
-			// @ assert isCompleted(bytes.View(path)[:r])
+			// @ assert isCompleted(sl.View(path)[:r])
 			r += 2
-			// @ assert willBeCompleted(bytes.View(path), r)
+			// @ assert willBeCompleted(sl.View(path), r)
 			// @ assert r <= n
 			// @ assert getW(&out)+2 <= r
 			// @ assert lazybufInvariant(&out)
@@ -306,14 +306,14 @@ func Clean(path string_byte) (res string_byte) {
 				// @ fold Lazybuf(&out, R41)
 				// @ ghost prev := getValue(&out)
 				// @ ghost origW := getW(&out)
-				// @ assert SpecClean(ToPath(bytes.View(path)[:r] )) == ToPath( getValue(&out) )
+				// @ assert SpecClean(ToPath(sl.View(path)[:r] )) == ToPath( getValue(&out) )
 				// @ ghost prevPath := ToPath(getValue(&out))
 				// @ lemmaToPathNonEmpty(getValue(&out))
 				// @ ghost reducedPath := Path { rooted: prevPath.rooted, parts: prevPath.dirname() }
 				// @ ghost ch := lastByte(getValue(&out))
 				// @ lemmaNoTrailingSlashPath(getValue(&out), rooted)
 				// @ assert len(prevPath.parts) == len(reducedPath.parts) + 1
-				// @ assert len(prevPath.basename()) != 0
+				// # assert len(prevPath.basename()) != 0
 				// @ unfold Lazybuf(&out, R41)
 
 				// @ assert InRangeInc(out.w, 1, len(out.s))
@@ -345,7 +345,7 @@ func Clean(path string_byte) (res string_byte) {
 				// @ invariant len(getValue(&out)) < len(prev)
 				// @ invariant cond == (getW(&out) > dotdot && out.specIndex(getW(&out)) != '/')
 
-				// @ invariant readingIsAheadOfWriting(bytes.View(path), getW(&out), r, rooted)
+				// @ invariant readingIsAheadOfWriting(sl.View(path), getW(&out), r, rooted)
 				// @ invariant len(ToPath(out.valueUntrimmed()[:getW(&out)+1]).parts) > 0
 				// @ invariant ToPath(out.valueUntrimmed()[:getW(&out)+1]).dirname() == reducedPath.parts
 				for cond {
@@ -406,11 +406,11 @@ func Clean(path string_byte) (res string_byte) {
 			// @ assert dotdotInvariant(dotdot, rooted, getValue(&out))
 			// @ assert getW(&out) != (rooted ? 1 : 0) ==> getW(&out) < r
 			// @ lemmaToPathAppendingDotdot(
-			// @   ToPath(bytes.View(path)[:r-2] ),
-			// @   bytes.View(path)[:r-2],
+			// @   ToPath(sl.View(path)[:r-2] ),
+			// @   sl.View(path)[:r-2],
 			// @ )
 
-			// @ assert SpecClean(ToPath(bytes.View(path)[:r] )) == ToPath( getValue(&out) )
+			// @ assert SpecClean(ToPath(sl.View(path)[:r] )) == ToPath( getValue(&out) )
 			// @ unfold Lazybuf(&out, R41)
 			case !rooted:
 				// cannot backtrack, but not rooted, so append .. element.
@@ -434,7 +434,7 @@ func Clean(path string_byte) (res string_byte) {
 			// @ assert rooted ==> 1 <= len(getValue(&out)) && getValue(&out)[0] == '/'
 			// @ assert noTrailingSlash(getValue(&out), rooted)
 			// @ assert noDoubleSlash(getValue(&out))
-			// @ assert readingIsAheadOfWriting(bytes.View(path), getW(&out), r, rooted)
+			// @ assert readingIsAheadOfWriting(sl.View(path), getW(&out), r, rooted)
 		default:
 			// real path element.
 			// add slash if needed
@@ -491,9 +491,9 @@ func Clean(path string_byte) (res string_byte) {
 				// @ lemmaLeqTransitive(getW(&out), r, n-1)
 				out.append(path[r])
 			}
-			// @ assert readingIsAheadOfWriting(bytes.View(path), getW(&out), r, rooted)
+			// @ assert readingIsAheadOfWriting(sl.View(path), getW(&out), r, rooted)
 			// @ assert r >= n || path[r] == '/'
-			// @ assert isCompleted(bytes.View(path)[:r]) || willBeCompleted(bytes.View(path), r)
+			// @ assert isCompleted(sl.View(path)[:r]) || willBeCompleted(sl.View(path), r)
 		}
 		// @ fold acc(sl.Bytes(path, 0, len(path)), R45)
 
@@ -511,7 +511,7 @@ func Clean(path string_byte) (res string_byte) {
 		//gobra:end-old-code 7217a0df192ee4c8dace6a1956998718431158b18202a1c4e6de8921479f6bd3
 		res = string_byte{'.'}
 		// @ fold acc(sl.Bytes(res, 0, len(res)), R40)
-		// @ assert SpecClean(ToPath(bytes.View(path))) == ToPath(bytes.View(res))
+		// @ assert SpecClean(ToPath(sl.View(path))) == ToPath(sl.View(res))
 		// @ assert acc(sl.Bytes(res, 0, len(res)), R41)
 		return res
 		//gobra:endrewrite 7217a0df192ee4c8dace6a1956998718431158b18202a1c4e6de8921479f6bd3
@@ -523,7 +523,7 @@ func Clean(path string_byte) (res string_byte) {
 	//gobra:end-old-code f5aa2c6509b2590f5eae382906e321f379502f39d2bd978429ef7b985350ce06
 	res = out.string()
 	// @ assert acc(sl.Bytes(res, 0, len(res)), R41)
-	// @ assert SpecClean(ToPath(bytes.View(path))) == ToPath(bytes.View(res))
+	// @ assert SpecClean(ToPath(sl.View(path))) == ToPath(sl.View(res))
 	return res
 	//gobra:endrewrite f5aa2c6509b2590f5eae382906e321f379502f39d2bd978429ef7b985350ce06
 }
