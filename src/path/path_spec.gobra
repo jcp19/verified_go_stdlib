@@ -72,15 +72,6 @@ pure func pathAppend(p Path, s Segment) (res Path) {
 }
 
 ghost
-requires Lazybuf(b, R41)
-ensures acc(b)
-ensures acc(sl.Bytes(b.s, 0, len(b.s)), R41)
-decreases _
-func lemmaFunnyUnfold(b *lazybuf) {
-	unfold Lazybuf(b, R41)
-}
-
-ghost
 requires acc(Lazybuf(b, R41), _)
 decreases
 pure func getW(b *lazybuf) (res int) {
@@ -175,26 +166,6 @@ decreases
 pure func bufIsEmpty(b *lazybuf) (res bool) {
 	return unfolding acc(Lazybuf(b, R41), _) in
 		len(b.buf) == 0
-}
-
-ghost
-requires false
-requires 0 < p1
-requires 0 < p2
-requires p2 < p1
-requires Lazybuf(b, p1)
-ensures Lazybuf(b, p2)
-ensures Lazybuf(b, p2) --* Lazybuf(b, p1)
-decreases _
-func lemmaLazybufReduce(b *lazybuf, p1, p2 perm) {
-	unfold Lazybuf(b, p1)
-	assert acc(sl.Bytes(b.s, 0, len(b.s)), p1)
-	fold Lazybuf(b, p2)
-	assert acc(sl.Bytes(b.s, 0, len(b.s)), p1-p2)
-	package Lazybuf(b, p2) --* Lazybuf(b, p1) {
-		unfold Lazybuf(b, p2)
-		fold Lazybuf(b, p1)
-	}
 }
 
 ghost
@@ -543,13 +514,6 @@ func lemmaSplitInnerAddNonSep(s, ac seq[byte], add byte, res1, res2 seq[seq[byte
 	}
 }
 
-// ghost
-// requires res == bytes.SplitInner(s, seq[byte]{'/'}, ac)
-// requires len(ac) > 0
-// ensures 0 < len(res[len(res)-1])
-// decreases
-// func lemmaSplitInnerNoTrailingSlash(p, ac seq[byte], res seq[seq[byte]]) {
-// }
 
 
 // ghost
@@ -957,11 +921,6 @@ requires a == b
 ensures c ++ a == c ++ b
 decreases
 func lemmaConcatEqualLeft(a, b, c seq[seq[byte]]) { }
-
-ghost
-ensures a ++ b ++ c == a ++ (b ++ c)
-decreases
-func lemmaConcatAssoc(a, b, c seq[seq[byte]]) { }
 
 ghost
 requires isCompleted(s)
