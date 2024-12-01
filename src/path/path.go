@@ -109,7 +109,6 @@ func (b *lazybuf) append(c byte) {
 	// @ outline (
 
 	// @ unfold Lazybuf(b, R41)
-	// @ assert InRangeInc(b.w, 0, len(b.buf))
 	// @ unfold sl.Bytes(b.buf, 0, len(b.buf))
 	b.buf[b.w] = c
 	// @ fold sl.Bytes(b.buf, 0, len(b.buf))
@@ -188,7 +187,6 @@ func Clean(path string_byte) (res string_byte) {
 	// @ unfold acc(sl.Bytes(path, 0, len(path)), R41)
 	rooted := path[0] == '/'
 	// @ fold   acc(sl.Bytes(path, 0, len(path)), R41)
-	// @ assert acc(sl.Bytes(path, 0, len(path)), R40)
 	n := len(path)
 
 	// Invariants:
@@ -303,32 +301,9 @@ func Clean(path string_byte) (res string_byte) {
 			/* @
 
 			ghost w := getW(&out)
-			ghost if w <= dotdot {
-				assert w == dotdot
-				ghost if dotdot == (rooted ? 1 : 0) {
-					assert len(getValue(&out)) == (rooted ? 1 : 0)
-					assert noTrailingSlash(getValue(&out), rooted)
-				} else {
-					assert getValue(&out)[dotdot-1] != '/'
-				}
-				assert noTrailingSlash(getValue(&out), rooted)
-			} else {
-				assert out.specIndex(w) == '/'
-				ghost value := getValue(&out)
-				ghost v := out.valueUntrimmed()
-				assert out.valueUntrimmed()[w] == '/'
-				assert prev[:origW] == out.valueUntrimmed()[:origW]
-				assert w < origW
-				assert len(value) < len(prev)
-				assert prev[:w] == value
-				assert noDoubleSlash(prev)
-				assert prev[w] == '/'
-				ghost if len(getValue(&out)) != (rooted ? 1 : 0) {
-					assert v[w] == '/'
-					lemmaNoTrailingSlash(prev, w, rooted)
-				}
+			ghost if w > dotdot && len(getValue(&out)) != (rooted ? 1 : 0) {
+				lemmaNoTrailingSlash(prev, w, rooted)
 
-				assert noTrailingSlash(getValue(&out), rooted)
 			}
 			@ */
 			// @ lemmaToPathAppendingDotdot(
@@ -339,7 +314,6 @@ func Clean(path string_byte) (res string_byte) {
 			// @ unfold Lazybuf(&out, R41)
 			case !rooted:
 				// cannot backtrack, but not rooted, so append .. element.
-				// @ assert out.w + 2 <= r
 				if out.w > 0 {
 					// @ fold Lazybuf(&out, R41)
 					out.append('/')
@@ -357,22 +331,6 @@ func Clean(path string_byte) (res string_byte) {
 			// add slash if needed
 			// @ unfold Lazybuf(&out, R41)
 			if rooted && out.w != 1 || !rooted && out.w != 0 {
-				/* @
-				ghost if rooted {
-					assert out.w != 1
-					assert r < n
-					assert r <= n-1
-					assert out.w <= r
-					assert out.w <= n-1
-					assert n == len(out.s)
-					assert out.w < len(out.s)
-				} else {
-					assert out.w != 0
-					// assert out.buf != nil
-					assert n == len(out.s)
-					assert out.w < len(out.s)
-				}
-				@ */
 				// @ fold Lazybuf(&out, R41)
 				out.append('/')
 				// @ unfold Lazybuf(&out, R41)
