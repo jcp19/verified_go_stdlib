@@ -38,6 +38,7 @@ type lazybuf struct {
 // @ ensures acc(Lazybuf(b, R41), R50)
 // @ ensures InRange(i, 0, len(getS(b)))
 // @ ensures b.specIndex(i) == res
+// @ decreases
 func (b *lazybuf) index(i int) (res byte) {
 	// @ unfold acc(Lazybuf(b, R41), R50)
 	// @ defer fold acc(Lazybuf(b, R41), R50)
@@ -70,6 +71,8 @@ func (b *lazybuf) index(i int) (res byte) {
 // @ ensures lastByte(getValue(b)) == c
 //
 // @ ensures getValue(b) == old(getValue(b)) ++ seq[byte]{ c }
+//
+// @ decreases
 func (b *lazybuf) append(c byte) {
 	// @ unfold Lazybuf(b, R41)
 	if b.buf == nil {
@@ -120,6 +123,8 @@ func (b *lazybuf) append(c byte) {
 // @ requires Lazybuf(b, R41)
 // @ ensures acc(sl.Bytes(res, 0, len(res)), R41)
 // @ ensures sl.View(res) == old(getValue(b))
+//
+// @ decreases
 func (b *lazybuf) string() (res string_byte) {
 	// @ unfold Lazybuf(b, R41)
 	if b.buf == nil {
@@ -169,6 +174,8 @@ func (b *lazybuf) string() (res string_byte) {
 // @ ensures acc( sl.Bytes(res, 0, len(res)), R41 )
 //
 // @ ensures SpecClean(ToPath(sl.View(path))) == ToPath(sl.View(res))
+//
+// @ decreases
 func Clean(path string_byte) (res string_byte) {
 	//gobra:rewrite 70493558394bddd26fc4913b3282a2fc8d74fce232cdd1932ae5fad203b0798b
 	//gobra:cont 	if path == "" {
@@ -220,7 +227,11 @@ func Clean(path string_byte) (res string_byte) {
 	// @ invariant noDoubleSlash(getValue(&out))
 	// @ invariant readingIsAheadOfWriting(sl.View(path), getW(&out), r, rooted)
 	// @ invariant SpecClean(ToPath(sl.View(path)[:r] )) == ToPath( getValue(&out) )
+	// @ decreases n - r
 	for r < n {
+		// @ ghost oldR := r
+		// @ ghost oldN := n
+		// @ ghost measure := n - r
 		// @ unfold acc(sl.Bytes(path, 0, len(path)), R45)
 		switch {
 		case path[r] == '/':
@@ -282,6 +293,7 @@ func Clean(path string_byte) (res string_byte) {
 				// @ invariant readingIsAheadOfWriting(sl.View(path), getW(&out), r, rooted)
 				// @ invariant len(ToPath(out.valueUntrimmed()[:getW(&out)+1]).parts) > 0
 				// @ invariant ToPath(out.valueUntrimmed()[:getW(&out)+1]).dirname() == reducedPath.parts
+				// @ decreases getW(&out)
 				for cond {
 					//gobra:endrewrite 30e2737508b727f0d5dfa371555f9b954bf541ea0deccbcda2841807f6db60bb
 					// @ ghost prev := getValue(&out)
@@ -344,7 +356,9 @@ func Clean(path string_byte) (res string_byte) {
 			// @ invariant getW(&out) <= r
 			// @ invariant n == len(getS(&out))
 			// @ invariant lazybufInvariant(&out)
+			// @ invariant origR <= r
 			// @ invariant forall i int :: {&path[i]} 0 <= i && i < len(path) ==> acc(&path[i], R50)
+			// @ invariant !(r < n && path[r] != '/') ==> origR < r
 			// @ invariant rooted ==> 1 <= len(getValue(&out)) && getValue(&out)[0] == '/'
 			// @ invariant r != origR ==> noTrailingSlash(getValue(&out), rooted)
 			// @ invariant dotdotInvariant(dotdot, rooted, getValue(&out))
@@ -355,9 +369,13 @@ func Clean(path string_byte) (res string_byte) {
 				// @ lemmaLeqTransitive(getW(&out), r, n-1)
 				out.append(path[r])
 			}
+
 		}
 		// @ fold acc(sl.Bytes(path, 0, len(path)), R45)
 
+		// @ assert oldR < r
+		// @ assert oldN == n
+		// @ assert measure > n - r
 	}
 
 	// Turn empty string into "."
@@ -429,6 +447,8 @@ func Split(path string_byte) (dir, file string_byte) {
 // The result is Cleaned. However, if the argument list is
 // empty or all its elements are empty, Join returns
 // an empty string.
+//
+// @ requires false
 // @ trusted
 func Join(elem []string_byte) string_byte {
 	size := 0
@@ -458,6 +478,8 @@ func Join(elem []string_byte) string_byte {
 // The extension is the suffix beginning at the final dot
 // in the final slash-separated element of path;
 // it is empty if there is no dot.
+//
+// @ requires false
 // @ trusted
 func Ext(path string_byte) string_byte {
 	for i := len(path) - 1; i >= 0 && path[i] != '/'; i-- {
@@ -472,6 +494,8 @@ func Ext(path string_byte) string_byte {
 // Trailing slashes are removed before extracting the last element.
 // If the path is empty, Base returns ".".
 // If the path consists entirely of slashes, Base returns "/".
+//
+// @ requires false
 // @ trusted
 func Base(path string_byte) string_byte {
 	//gobra:rewrite 70493558394bddd26fc4913b3282a2fc8d74fce232cdd1932ae5fad203b0798b
@@ -499,6 +523,8 @@ func Base(path string_byte) string_byte {
 }
 
 // IsAbs reports whether the path is absolute.
+//
+// @ requires false
 // @ trusted
 func IsAbs(path string_byte) bool {
 	return len(path) > 0 && path[0] == '/'
@@ -511,6 +537,8 @@ func IsAbs(path string_byte) bool {
 // If the path consists entirely of slashes followed by non-slash bytes, Dir
 // returns a single slash. In any other case, the returned path does not end in a
 // slash.
+//
+// @ requires false
 // @ trusted
 func Dir(path string_byte) string_byte {
 	dir, _ := Split(path)
