@@ -526,7 +526,7 @@ func Base(path string_byte) string_byte {
 //
 // @ preserves acc(sl.Bytes(path, 0, len(path)), R50)
 //
-// @ ensures res == ToPath(sl.View(path)).IsRooted()
+// @ ensures res == ToPath(sl.View(path)).IsAbs()
 //
 // @ decreases
 func IsAbs(path string_byte) (res bool) {

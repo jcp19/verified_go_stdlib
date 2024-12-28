@@ -58,7 +58,7 @@ pure func (p Path) basename() (res Segment) {
 
 ghost
 decreases
-pure func (p Path) IsRooted() (res bool) {
+pure func (p Path) IsAbs() (res bool) {
 	return p.rooted
 }
 
