@@ -524,9 +524,14 @@ func Base(path string_byte) string_byte {
 
 // IsAbs reports whether the path is absolute.
 //
-// @ requires false
-// @ trusted
-func IsAbs(path string_byte) bool {
+// @ preserves acc(sl.Bytes(path, 0, len(path)), R50)
+//
+// @ ensures res == ToPath(sl.View(path)).IsRooted()
+//
+// @ decreases
+func IsAbs(path string_byte) (res bool) {
+	// @ unfold acc(sl.Bytes(path, 0, len(path)), R50)
+	// @ defer fold acc(sl.Bytes(path, 0, len(path)), R50)
 	return len(path) > 0 && path[0] == '/'
 }
 

@@ -58,6 +58,12 @@ pure func (p Path) basename() (res Segment) {
 
 ghost
 decreases
+pure func (p Path) IsRooted() (res bool) {
+	return p.rooted
+}
+
+ghost
+decreases
 pure func newPath(rooted bool) (res Path) {
 	return Path{parts: seq[Segment]{}, rooted: rooted}
 }
