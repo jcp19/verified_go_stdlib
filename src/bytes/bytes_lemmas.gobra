@@ -1,0 +1,572 @@
+package bytes
+
+//+gobra
+
+import (
+	. "verification/utils/definitions"
+	sl "gobra-libs/byteslice"
+	bytes "gobra-libs/bytes"
+	. "bytes/spec"
+	"unicode/utf8"
+)
+
+decreases
+requires acc(sl.Bytes(b, 0, len(b)), _)
+pure func String(b []byte) string  {
+	return unfolding acc(sl.Bytes(b, 0, len(b)), _) in string(b)
+}
+
+// We cannot yet prove this with the current incomplete encoding of strings
+ghost
+requires acc(sl.Bytes(a, 0, len(a)), _)
+requires acc(sl.Bytes(b, 0, len(b)), _)
+ensures (String(a) == String(b)) == (sl.View(a) == sl.View(b))
+decreases
+pure func stringEqualsImplViewEquals(a, b []byte) bool
+
+
+// Count
+
+/*
+
+ghost
+decreases len(s)
+pure func SpecCount(s, sep seq[byte]) (res int) {
+	return len(sep) == 0 ?
+		len(utf8.Codepoints(s)) + 1 :
+		len(s) < len(sep) ?
+			0 :
+			s[:len(sep)] == sep ?
+				1 + SpecCount(s[len(sep):], sep) :
+				SpecCount(s[1:], sep)
+}
+
+*/
+
+ghost
+requires 0 < len(sep)
+requires InRangeInc(i, 0, len(s))
+ensures SpecCountIntermediate(s, sep, i) == SpecCount(s[i:], sep)
+decreases len(s) - i
+func lemmaSpecCountLowering(s, sep seq[byte], i int) {
+	if i == len(s) {
+		assert len(s[i:]) < len(sep)
+		assert SpecCount(s[i:], sep) == 0
+		assert SpecCountIntermediate(s, sep, i) == 0
+		return
+	}
+
+	if s[i:i+len(sep)] == sep {
+		assert s[i:][len(sep):] == s[i+len(sep):]
+		lemmaSpecCountLowering(s, sep, i+len(sep))
+
+		return
+	}
+
+	assert s[i:][1:] == s[i+1:]
+	lemmaSpecCountLowering(s, sep, i+1)
+
+}
+
+ghost
+requires 0 < len(sep)
+requires 0 <= i
+ensures res == len(SpecCountIndices(s, sep, i))
+decreases len(s) - i
+pure func SpecCountIntermediate(s, sep seq[byte], i int) (res int) {
+	return i >= len(s) ?
+		0 :
+		s[i:i+len(sep)] == sep ?
+			1 + SpecCountIntermediate(s, sep, i + len(sep)) :
+			SpecCountIntermediate(s, sep, i + 1)
+}
+
+
+ghost
+requires len(sep) > 0
+requires 0 <= i
+ensures forall j int :: {j in res} j in res ==> InRangeInc(j, i, len(s)-len(sep)) && s[j:j+len(sep)] == sep
+ensures forall j, k int :: {j in res, k in res} j in res && k in res && j < k ==> j + len(sep) <= k
+decreases len(s) - i
+pure func SpecCountIndices(s, sep seq[byte], i int) (res set[int]) {
+	return i >= len(s) ?
+		set[int]{} :
+		s[i:i+len(sep)] == sep ?
+			set[int]{i} union SpecCountIndices(s, sep, i + len(sep)) :
+			SpecCountIndices(s, sep, i + 1)
+}
+
+ghost
+requires forall j int :: {j in indices} j in indices ==> 0 <= j && j < len(b)
+requires forall j int :: {j in indices} j in indices ==> ( b[j] == c)
+requires forall j int :: {j in indices} !(j in indices) ==> ( j < 0 || len(b) <= j || b[j] != c)
+ensures indices == SpecCountIndices(b, seq[byte]{c}, 0)
+decreases
+trusted
+// before implementing this lemma, we should consider changing the specs of bytealg.Count to use SpecCountIndices
+func lemmaBytealgCount(indices set[int], b seq[byte], c byte)
+
+// currently unused but might be interesting to expose
+ghost
+requires len(sep) > 0
+requires InRangeInc(idx, 0, len(s))
+requires 0 <= i
+requires idx in SpecCountIndices(s, sep, i)
+ensures SpecCountIndices(s, sep, i) == SpecCountIndices(s[:idx], sep, i) union SpecCountIndices(s, sep, idx)
+decreases idx - i
+func lemmaSpecCountIndicesSplit(s, sep seq[byte], idx, i int) {
+	assert InRangeInc(idx, 0, len(s)-len(sep)) && s[idx:idx+len(sep)] == sep
+
+	if idx == 0 {
+		return
+	}
+
+	if idx == i {
+		assert s[i:i+len(sep)] == sep
+
+		return
+	}
+
+	if s[i:i+len(sep)] == sep {
+		assert SpecCountIndices(s, sep, i) == set[int]{i} union SpecCountIndices(s, sep, i + len(sep))
+		assert SpecCountIndices(s[:idx], sep, i) == set[int]{i} union SpecCountIndices(s[:idx], sep, i + len(sep))
+		lemmaSpecCountIndicesSplit(s, sep, idx, i+len(sep))
+		return
+	}
+
+			// SpecCountIndices(s, sep, i + 1)
+
+	assert SpecCountIndices(s, sep, i) == SpecCountIndices(s, sep, i + 1)
+	assert SpecCountIndices(s[:idx], sep, i) == SpecCountIndices(s[:idx], sep, i + 1)
+	lemmaSpecCountIndicesSplit(s, sep, idx, i+1)
+}
+
+
+ghost
+requires len(sep) > 0
+requires InRangeInc(n, 0, len(s))
+requires InRangeInc(idx, 0, n)
+requires InRangeInc(i, 0, len(s))
+requires forall j int :: {s[j:j+len(sep)]} idx <= j && j + len(sep) <= n ==> s[j:j+len(sep)] != sep
+requires idx == 0 || idx-len(sep) in indices
+requires SpecCountIndices(s[:idx], sep, 0) == indices
+requires !(idx - len(sep) < i && i < idx)
+ensures SpecCountIndices(s[:idx], sep, i) == SpecCountIndices(s[:n], sep, i)
+decreases n - i
+func lemmaCountSepNotFoundInTail(s, sep seq[byte], indices set[int], idx, i, n int) {
+	switch {
+	case i >= n:
+	case s[:idx][i:i+len(sep)] == sep:
+		assert i < idx
+		assert i <= idx-len(sep)
+		assert s[:idx][i:i+len(sep)] == s[i:i+len(sep)]
+		assert SpecCountIndices(s[:idx], sep, i) == set[int]{i} union SpecCountIndices(s[:idx], sep, i + len(sep))
+		assert SpecCountIndices(s, sep, i) == set[int]{i} union SpecCountIndices(s, sep, i + len(sep))
+
+		// TODO: this i will not be in indices because SpecCountIndices(s, sep, 0) would skip this i
+		assume !InRange(i+len(sep), idx-len(sep)+1, idx)
+
+		lemmaCountSepNotFoundInTail(s, sep, indices, idx, i + len(sep), n)
+	case i >= idx && i + len(sep) > n:
+	case i >= idx:
+		assert i + len(sep) <= n
+		assert s[i:i+len(sep)] != sep
+		lemmaCountSepNotFoundInTail(s, sep, indices, idx, i + 1, n)
+	case i < idx - len(sep):
+		assert s[i:i+len(sep)] != sep
+		assert SpecCountIndices(s[:idx], sep, i) == SpecCountIndices(s[:idx], sep, i + 1)
+		assert SpecCountIndices(s, sep, i) == SpecCountIndices(s, sep, i + 1)
+		lemmaCountSepNotFoundInTail(s, sep, indices, idx, i + 1, n)
+	default:
+		assert i < idx
+		assert i >= idx - len(sep)
+		assert i != idx-len(sep)
+		assert idx - len(sep) < i
+		assert false // contradiction
+	}
+}
+
+
+ghost
+requires len(sep) > 0
+requires InRangeInc(idx, 0, len(s))
+requires InRangeInc(i, 0, len(s))
+requires InRangeInc(k, 0, len(s[idx:])-len(sep))
+requires forall j int :: {s[idx:][j:j+len(sep)]} 0 <= j && j < k ==> s[idx:][j:j+len(sep)] != sep
+requires s[idx+k:idx+k+len(sep)] == sep
+requires idx == 0 || idx-len(sep) in indices
+requires SpecCountIndices(s[:idx], sep, 0) == indices
+ensures SpecCountIndices(s[:idx+k+len(sep)], sep, i) == SpecCountIndices(s[:idx], sep, i) union set[int]{idx+k}
+decreases
+func lemmaCountSepFound(s, sep seq[byte], indices set[int], idx, k, i int) {
+
+	if idx - len(sep) < i && i < idx {
+		// TODO: i cannot be in this range, because SpecCountIndices would skip it
+		assume !(idx-len(sep) in indices)
+
+		assert false // contradiction
+	}
+
+	n := idx+k+len(sep)
+
+	assert forall j int :: {s[idx:][j:j+len(sep)]} 0 <= j && j < k ==> s[idx:][j:j+len(sep)] != sep
+	assert forall j int :: {s[idx:][j:j+len(sep)]} 0 <= j && j <= k-1 ==> s[idx:][j:j+len(sep)] != sep
+	lemmaSepNotEquals(s, sep, idx, k-1)
+	assert forall j int :: {s[j:j+len(sep)]} idx <= j && j+len(sep) < idx+k+len(sep) ==> s[j:j+len(sep)] != sep
+	assert SpecCountIndices(s[:idx], sep, 0) == indices
+	assert idx - len(sep) >= i || i >= idx
+	lemmaCountSepNotFoundInTail(s, sep, indices, idx, i, n-1)
+
+
+	assert SpecCountIndices(s[:idx], sep, i) == SpecCountIndices(s[:n-1], sep, i)
+
+	// TODO: this should hold
+	assume SpecCountIndices(s[:n], sep, i) == SpecCountIndices(s[:n-1], sep, i) union set[int]{idx+k}
+}
+
+
+
+// Repeat
+
+
+ghost
+requires a + 1 <= b
+ensures  a < b
+decreases
+func lemmaLeqToLt(a, b int) { }
+
+ghost
+requires bp < lnb
+requires bp == lb * i
+requires lnb == lb * count
+requires 0 <= lb
+ensures  i < count
+decreases
+func lemmaStillHaveToRepeat(i, count, bp, lb, lnb int) {
+	if lb != 0 {
+		assert lb * i < lnb
+		LemmaLeqTransitive(lb * i+1, lnb, lb*count)
+		assert lb*i + 1 <= lb * count
+		lemmaLeqToLt(lb*i, lb*count)
+		assert lb * i < lb * count
+		LemmaMulInjLtLeftInv(i, count, lb)
+		assert i < count
+	}
+}
+
+
+
+
+ghost
+requires InRangeInc(bp, 0, len(nb))
+requires InRangeInc(nCopied, 0, bp)
+requires bp + nCopied <= len(nb)
+requires acc(sl.Bytes(nb, 0, len(nb)), R50)
+requires SubSliceOverlaps(nb, bp, len(nb))
+requires unfolding acc(sl.Bytes(nb, 0, len(nb)), R50) in forall i int :: {&nb[bp:][i]}{&nb[:bp][i]} 0 <= i && i < nCopied ==>  nb[bp:][i] ==  nb[:bp][i]
+ensures acc(sl.Bytes(nb, 0, len(nb)), R50)
+ensures sl.View(nb)[:nCopied] == sl.View(nb)[bp:bp+nCopied]
+decreases
+func lemmaDidCopy(nb []byte, bp, nCopied int) {
+	unfold acc(sl.Bytes(nb, 0, len(nb)), R50)
+	assert forall i int :: {&nb[bp+i]}{&nb[bp:][i]} 0 <= i && i < nCopied ==> &nb[bp:][i] == &nb[bp+i]
+	assert forall i int :: {&nb[:bp][i]}{&nb[i]} 0 <= i && i < nCopied ==> &nb[:bp][i] == &nb[i]
+	assert forall i int :: {&nb[bp+i]}{&nb[bp:][i]} 0 <= i && i < nCopied ==>  nb[bp+i]   ==  nb[bp:][i]
+	assert forall i int :: {&nb[bp+i]}{&nb[i]} 0 <= i && i < nCopied ==>  nb[bp+i]   ==  nb[i]
+	fold acc(sl.Bytes(nb, 0, len(nb)), R50)
+}
+
+ghost
+requires l1 == l2
+requires h1 == h2
+ensures a[l1:h1] == a[l2:h2]
+decreases
+func lemmaSubstSlicing(a seq[byte], l1, h1, l2, h2 int) { }
+
+ghost
+requires len(nb) == len(b) * count
+requires InRangeInc(bp, 0, len(nb))
+requires InRangeInc(nCopied, 0, bp)
+requires bp == nCopied || bp + nCopied == len(nb)
+requires bp == nCopied ==> i*2 <= count
+requires bp + nCopied == len(nb) ==> count <= i*2
+requires bp == i * len(b)
+requires nb[:nCopied] == nb[bp:bp+nCopied]
+ensures  (nb[:i * len(b)] ++ nb[:i * len(b)])[:count * len(b)] == nb[: MinInt(count, i*2) * len(b)]
+decreases
+func lemmaDouble(nb seq[byte], b seq[byte], i, bp, count, nCopied int) {
+	if bp == nCopied {
+		assert nb[:i * len(b)] == nb[:bp]
+		assert nb[:bp] == nb[:nCopied]
+		assert nb[bp:bp+nCopied] == nb[bp:bp+bp]
+		assert nb[:bp] ++ nb[bp:bp+bp] == nb[:bp+bp]
+		assert bp+bp == i*2 * len(b)
+		assert nb[:i * len(b)] ++ nb[:i * len(b)] == nb[:bp+bp]
+		assert count * len(b) >= bp+bp
+		assert len(nb[:bp+bp]) == bp+bp
+		assert (nb[:i * len(b)] ++ nb[:i * len(b)])[:count * len(b)] == nb[:bp+bp]
+		assert MinInt(count, i * 2) == i * 2
+		LemmaMulInjEq(MinInt(count, i * 2), i*2, len(b))
+		x := MinInt(count, i * 2)
+		y := i * 2
+		assert x == y
+		assert x * len(b) == y * len(b)
+		assert MinInt(count, i * 2) * len(b) == (i * 2) * len(b)
+		lemmaSubstSlicing(nb, 0, MinInt(count, i * 2) * len(b), 0, (i*2) * len(b))
+		assert nb[:MinInt(count, i * 2) * len(b)] == nb[: (i*2) * len(b)]
+		assert nb[:bp+bp] == nb[: i*2 * len(b)]
+	} else {
+		assert bp + nCopied == len(nb)
+		assert nb[:i * len(b)] == nb[:bp]
+		assert nb[:bp] ++ nb[bp:bp+nCopied] == nb
+		assert nb[:nCopied] == nb[bp:bp+nCopied]
+		assert (nb[:i * len(b)] ++ nb[:i * len(b)])[:len(nb)] == nb
+		assert MinInt(count, i*2) == count
+		LemmaMulInjEq(MinInt(count, i * 2), count, len(b))
+		assert nb[: MinInt(count, i*2) * len(b)] == nb
+	}
+}
+
+
+
+ghost
+requires len(a) <= n
+ensures  (a ++ b)[:n] == a ++ b[:n-len(a)]
+decreases
+func lemmaSliceSeqConcat(a, b seq[byte], n int) { }
+
+ghost
+requires 0 <= a
+requires 0 <= b
+ensures  bytes.Repeat(s, a)[: b * len(s)] == bytes.Repeat(s, MinInt(a, b))
+decreases b
+func lemmaSlicingRepeat(s seq[byte], a, b int) {
+	r := bytes.Repeat(s, a)
+	switch {
+	case a == 0:
+		assert MinInt(a, b) == 0
+		assert bytes.Repeat(s, 0) == seq[byte]{}
+	case b == 0:
+		assert MinInt(a, b) == 0
+		assert bytes.Repeat(s, 0) == seq[byte]{}
+	case a == b:
+		assert bytes.Repeat(s, a) == s ++ bytes.Repeat(s, a-1)
+		bytes.LemmaRepeatLength(s, a)
+		assert len(r) == len(s) * a
+		assert len(r) == len(s) * b
+		assert bytes.Repeat(s, a)[: b * len(s)] == bytes.Repeat(s, MinInt(a, b))
+	case a <= b:
+		bytes.LemmaRepeatLength(s, a)
+		assert len(r) == len(s) * a
+		assert a <= b
+		LemmaMulInjLeq(a, b, len(s))
+		assert a*len(s) <= b*len(s)
+		LemmaLeqTransitive(len(r), a*len(s), b*len(s))
+		assert len(r) <= b * len(s)
+		assert bytes.Repeat(s, a)[:b * len(s)] == bytes.Repeat(s, a)
+		assert MinInt(a, b) == a
+		assert bytes.Repeat(s, MinInt(a, b)) == bytes.Repeat(s, a)
+		assert bytes.Repeat(s, a)[: b * len(s)] == bytes.Repeat(s, MinInt(a, b))
+		LemmaEqTransitive_seq(bytes.Repeat(s, a)[:b * len(s)],bytes.Repeat(s, a),  bytes.Repeat(s, MinInt(a, b)))
+	case b < a:
+		assert bytes.Repeat(s, a) == s ++ bytes.Repeat(s, a - 1)
+		lemmaSlicingRepeat(s, a-1, b-1)
+		assert bytes.Repeat(s, a-1)[: (b-1) * len(s)] == bytes.Repeat(s, MinInt(a-1, b-1))
+		assert bytes.Repeat(s, a)[: b * len(s)] == (s ++ bytes.Repeat(s, a - 1))[: b * len(s)]
+		assert 1 <= b
+		LemmaMulInjLeq(1, b, len(s))
+		assert len(s) <= b * len(s)
+		lemmaSliceSeqConcat(s, bytes.Repeat(s, a-1), b * len(s))
+		assert b * len(s) - len(s) == (b-1) * len(s)
+		assert (s ++ bytes.Repeat(s, a - 1))[: b * len(s)] == s ++ bytes.Repeat(s, a - 1)[:(b-1)*len(s)]
+		assert bytes.Repeat(s, a)[: b * len(s)] == bytes.Repeat(s, MinInt(a, b))
+	default:
+		assert false
+	}
+}
+
+
+// index
+
+ghost
+requires 2 <= len(s)
+requires t == len(s) - len(sep) + 1
+requires 0 <= i && i+1 <= t && t <= len(s)
+requires i < t
+requires s[i] != sep[0]
+requires forall j int :: { s[j:j+len(sep)] } 0 <= j && j < i ==> s[j:j+len(sep)] != sep
+requires forall j int :: { s[i+1:t][j] } 0 <= j && j < len(s[i+1:t]) ==> s[i+1:t][j] != sep[0]
+ensures  forall j int :: { s[j:j+len(sep)] } 0 <= j && j < t ==> s[j:j+len(sep)] != sep
+decreases
+func lemmaIndexIndexByteNotFound(s, sep seq[byte], i, t int) {
+	invariant i+1 <= idx
+	invariant forall j int :: { s[j:j+len(sep)] } 0 <= j && j < idx ==> s[j:j+len(sep)] != sep
+	decreases t-idx
+	for idx := i+1; idx < t; idx++ {
+		assert s[idx] == s[i+1:t][idx - (i+1)]
+		assert s[idx] != sep[0]
+		assert s[idx:idx+len(sep)] != sep
+	}
+}
+
+ghost
+requires 0 <= a
+requires forall j int :: {s[a:][j:j+len(sep)]} 0 <= j && j <= b ==> s[a:][j:j+len(sep)] != sep
+ensures  forall j int :: {s[j:j+len(sep)]} a <= j && j <= a+b ==> s[j:j+len(sep)] != sep
+decreases
+func lemmaSepNotEquals(s, sep seq[byte], a, b int) {
+	if b < 0 {
+		return
+	}
+	invariant InRangeInc(k, a, a+b+1)
+	invariant forall i0 int :: { s[i0:i0+len(sep)] } InRange(i0, a, k) ==>
+		s[i0:i0+len(sep)] != sep
+	decreases a+b+1-k
+	for k := a; k < a+b+1; k++ {
+		assert s[k:k+len(sep)] == s[a:][k-a:k-a+len(sep)]
+	}
+
+}
+
+
+ghost
+requires InRangeInc(low, 0, len(s))
+requires InRangeInc(high, low, len(s))
+preserves acc(sl.Bytes(s[low:high], 0, len(s[low:high])), R50)
+preserves acc(sl.Bytes(s, 0, len(s)), R50)
+ensures sl.View(s[low:high]) == sl.View(s)[low:high]
+ensures sl.View(s)[low:high] == sl.View(s[low:high])
+decreases
+func lemmaViewSubslice(s []byte, low, high int) {
+	a := sl.View(s)[low:high]
+	b := sl.View(s[low:high])
+	l := len(sl.View(s)[low:high])
+	assert len(sl.View(s[low:high])) == l
+
+	invariant InRangeInc(k, 0, l)
+	invariant acc(sl.Bytes(s[low:high], 0, len(s[low:high])), R50)
+	invariant acc(sl.Bytes(s, 0, len(s)), R50)
+	invariant a == sl.View(s)[low:high]
+	invariant b == sl.View(s[low:high])
+	invariant forall i int :: {a[i]}{b[i]} 0 <= i && i < k ==> a[i] == b[i]
+	decreases l-k
+	for k := 0; k < l; k++ {
+		assert a[k] == sl.Byte(s, 0, len(s), k+low)
+		assert b[k] == sl.Byte(s[low:high], 0, len(s[low:high]), k)
+
+		unfold acc(sl.Bytes(s[low:high], 0, len(s[low:high])), R50/2)
+		unfold acc(sl.Bytes(s, 0, len(s)), R50/2)
+
+		SubSliceOverlaps(s, low, high)
+
+		fold acc(sl.Bytes(s[low:high], 0, len(s[low:high])), R50/2)
+		fold acc(sl.Bytes(s, 0, len(s)), R50/2)
+
+		assert a[k] == b[k]
+	}
+}
+
+
+
+
+
+
+// new index lemmas:
+
+ghost
+requires InRangeInc(res, 0, len(s)-len(sep)+1)
+requires 2 <= len(sep)
+requires forall i int :: {s[i]} 0 <= i && i < res ==> s[i] != sep[0]
+ensures NotFoundInPrefix(s, sep, res)
+decreases
+func lemmaIndexBytePromote(s, sep seq[byte], res int) {
+	invariant InRangeInc(j, 0, res)
+	invariant forall i0 int :: { s[i0:i0+len(sep)] } InRange(i0, 0, j) ==>
+		s[i0:i0+len(sep)] != sep
+	decreases res-j
+	for j := 0; j < res; j++ {
+		k := j
+		assert s[k:k+len(sep)][0] == s[k]
+		assert s[k:k+len(sep)][0] != sep[0]
+		assert s[k:k+len(sep)] != sep
+	}
+
+	assert reveal NotFoundInPrefix(s, sep, res)
+}
+
+ghost
+requires InRangeInc(a, 0, len(s))
+requires InRangeInc(b, 0, len(s[a:]))
+requires NotFoundInPrefix(s, sep, a)
+requires NotFoundInPrefix(s[a:], sep, b)
+ensures  NotFoundInPrefix(s, sep, a+b)
+decreases
+func lemmaIndexNotFoundCombine(s, sep seq[byte], a, b int) {
+
+	invariant InRangeInc(j, a, a+b)
+	invariant NotFoundInPrefix(s, sep, j)
+	decreases a+b-j
+	for j := a; j < a+b; j++ {
+		k := j+1
+		assert reveal NotFoundInPrefix(s[a:], sep, b)
+		assert reveal NotFoundInPrefix(s, sep, j)
+		assert s[j:j+len(sep)] == s[a:][j-a:j-a+len(sep)]
+		assert s[k:k+len(sep)] == s[a:][k-a:k-a+len(sep)]
+		assert s[a:][j-a:j-a+len(sep)] != sep
+		if k >= a+b {
+			assert k == a+b
+			assert forall i0 int :: { s[i0:i0+len(sep)] } 0 <= i0 && i0 < j ==>
+				s[i0:i0+len(sep)] != sep
+			assert forall i0 int :: { s[i0:i0+len(sep)] } 0 <= i0 && i0 < a+b ==>
+				s[i0:i0+len(sep)] != sep
+			assert reveal NotFoundInPrefix(s, sep, j+1)
+			continue
+		}
+		assert s[a:][k-a:k-a+len(sep)] != sep
+
+		assert s[k:k+len(sep)] != sep
+
+		assert reveal NotFoundInPrefix(s, sep, j+1)
+
+	}
+
+}
+
+
+ghost
+requires 0 < len(sep)
+requires InRange(i, 0, len(s))
+requires NotFoundInPrefix(s, sep, i)
+requires s[i] != sep[0]
+ensures  NotFoundInPrefix(s, sep, i+1)
+decreases
+func lemmaIndexNotFoundInPrefixFirstByteMismatch(s, sep seq[byte], i int) {
+	assert reveal NotFoundInPrefix(s, sep, i)
+	assert reveal NotFoundInPrefix(s, sep, i+1)
+}
+
+ghost
+requires 0 < len(sep)
+requires InRange(i, 0, len(s))
+requires NotFoundInPrefix(s, sep, i)
+requires s[i:i+len(sep)] != sep
+ensures  NotFoundInPrefix(s, sep, i+1)
+decreases
+func lemmaIndexNotFoundInPrefixFirstInstanceMismatch(s, sep seq[byte], i int) {
+	assert reveal NotFoundInPrefix(s, sep, i)
+	assert reveal NotFoundInPrefix(s, sep, i+1)
+}
+
+ghost
+requires s1 == s2
+requires InRangeInc(i, 0, len(s1))
+ensures  NotFoundInPrefix(s1, sep, i) == NotFoundInPrefix(s2, sep, i)
+decreases
+func lemmaSubstNotFoundInPrefix(s1, s2, sep seq[byte], i int) { }
+
+ghost
+ensures NotFoundInPrefix(s, sep, 0)
+decreases
+func lemmaNotFoundInEmptyPrefix(s, sep seq[byte]) {
+	assert reveal NotFoundInPrefix(s, sep, 0)
+}

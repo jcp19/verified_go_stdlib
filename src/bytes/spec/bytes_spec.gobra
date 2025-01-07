@@ -1,0 +1,69 @@
+package spec
+
+// +gobra
+
+import (
+	sl "gobra-libs/byteslice"
+	"unicode/utf8"
+)
+
+ghost
+requires low <= high
+ensures res == exists i int :: {i in s} i in s && low <= i && i < high
+opaque
+decreases high - low
+pure func SetContainsInRange(s set[int], low, high int) (res bool) {
+	return low < high && (low in s || ( low < high && SetContainsInRange(s, low + 1, high) ))
+}
+
+// Returns true iff a == a[:i] ++ b ++ as for some as.
+ghost
+requires 0 <= i && i + len(b) <= len(a)
+decreases
+pure func MatchesSubseqAt(a, b seq[byte], i int) (res bool) {
+	return a[i:i+len(b)] == b
+}
+
+ghost
+decreases
+pure func SpecHasPrefix(s, prefix seq[byte]) (res bool) {
+	return s[:len(prefix)] == prefix
+}
+
+ghost
+decreases
+pure func SpecHasSuffix(s, suffix seq[byte]) (res bool) {
+	return s[len(s)-len(suffix):] == suffix
+}
+
+ghost
+decreases
+pure func SpecTrimPrefix(s, prefix seq[byte]) (res seq[byte]) {
+	return SpecHasPrefix(s, prefix) ? s[len(prefix):] : s
+}
+
+ghost
+decreases
+pure func SpecTrimSuffix(s, suffix seq[byte]) (res seq[byte]) {
+	return SpecHasSuffix(s, suffix) ? s[:len(s)-len(suffix)] : s
+}
+
+ghost
+decreases
+opaque
+pure func NotFoundInPrefix(s, sep seq[byte], high int) (res bool) {
+	return forall j int :: { s[j:j+len(sep)] } 0 <= j && j < high ==>
+		s[j:j+len(sep)] != sep
+}
+
+ghost
+decreases len(s)
+pure func SpecCount(s, sep seq[byte]) (res int) {
+	return len(sep) == 0 ?
+		len(utf8.Codepoints(s)) + 1 :
+		len(s) == 0 ?
+			0 :
+			s[:len(sep)] == sep ?
+				1 + SpecCount(s[len(sep):], sep) :
+				SpecCount(s[1:], sep)
+}

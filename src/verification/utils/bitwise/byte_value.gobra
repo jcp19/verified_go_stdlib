@@ -1,0 +1,8 @@
+package bitwise
+
+//+gobra
+
+ghost
+ensures 0 <= b && b < 256
+decreases
+func ByteValue(b byte)
